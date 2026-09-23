@@ -1,0 +1,31 @@
+# Secrets
+.env
+.env.local
+*.env
+!.env.example
+
+# Python / backend
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# CLIP models (~600 MB, re-downloaded by scripts/clip_benchmark.py)
+backend/models/
+
+# Benchmark sample images: public ones are re-downloaded; your own photos may contain GPS
+backend/samples/public/*
+!backend/samples/public/CREDITS.md
+backend/samples/mine/*
+!backend/samples/mine/.gitkeep
+
+# Frontend (web/ has its own .gitignore too)
+web/node_modules/
+web/.next/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

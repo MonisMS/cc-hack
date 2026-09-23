@@ -1,0 +1,396 @@
+{
+  "run_at": "2026-09-23T23:48:59",
+  "machine": {
+    "hostname": "Monis",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python": "3.12.13",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13450HX",
+    "cpu_count": 16,
+    "ram_gb": 7.6
+  },
+  "models": {
+    "vision": "Qdrant/clip-ViT-B-32-vision",
+    "text": "Qdrant/clip-ViT-B-32-text"
+  },
+  "counts": {
+    "public_images": 14,
+    "my_images": 0
+  },
+  "speed_ms": {
+    "model_load_s": 2.43,
+    "preprocess_per_image": 22.7,
+    "first_embed_call": 60.4,
+    "per_image_batched": 32.3,
+    "single_image_warm": 45.2,
+    "per_text_query": 16.0,
+    "all_text_embeddings_total": 482.1
+  },
+  "vectors": {
+    "dims": [
+      512
+    ],
+    "dim_ok": true,
+    "raw_norm": {
+      "min": 1.0,
+      "max": 1.0,
+      "mean": 1.0
+    },
+    "already_normalised": true
+  },
+  "zero_shot": {
+    "top1_accuracy": 0.786,
+    "top3_accuracy": 0.857,
+    "correct_label_score": {
+      "min": 0.2377,
+      "max": 0.3458,
+      "mean": 0.2959
+    },
+    "best_wrong_label_score": {
+      "min": 0.2046,
+      "max": 0.3115,
+      "mean": 0.262
+    },
+    "all_scores": {
+      "min": 0.1331,
+      "max": 0.3458,
+      "mean": 0.2135
+    },
+    "per_image": [
+      {
+        "image": "Tree_Sapling_in_British_Columbia__Canada_2019.jpg",
+        "top3": [
+          [
+            "sapling",
+            0.294
+          ],
+          [
+            "deforestation",
+            0.2518
+          ],
+          [
+            "drought",
+            0.2336
+          ]
+        ],
+        "expected": "sapling"
+      },
+      {
+        "image": "Mangrove_plantation.jpg",
+        "top3": [
+          [
+            "mangrove",
+            0.3458
+          ],
+          [
+            "deforestation",
+            0.3115
+          ],
+          [
+            "sapling",
+            0.2891
+          ]
+        ],
+        "expected": "mangrove"
+      },
+      {
+        "image": "Flooded_Albizia_Saman__rain_tree__in_the_Mekong.jpg",
+        "top3": [
+          [
+            "flood",
+            0.2789
+          ],
+          [
+            "mangrove",
+            0.2722
+          ],
+          [
+            "deforestation",
+            0.2518
+          ]
+        ],
+        "expected": "flood"
+      },
+      {
+        "image": "Road_construction_vehicle__Bangalore__2025_.jpg",
+        "top3": [
+          [
+            "road_construction",
+            0.3058
+          ],
+          [
+            "solar",
+            0.2046
+          ],
+          [
+            "flood",
+            0.1998
+          ]
+        ],
+        "expected": "road_construction"
+      },
+      {
+        "image": "Road_construction_in_tea_plantation_JEG9546.jpg",
+        "top3": [
+          [
+            "road_construction",
+            0.3108
+          ],
+          [
+            "waste",
+            0.2375
+          ],
+          [
+            "deforestation",
+            0.23
+          ]
+        ],
+        "expected": "road_construction"
+      },
+      {
+        "image": "Field_of_Solar_Panels_near_Ogwell.jpg",
+        "top3": [
+          [
+            "solar",
+            0.3317
+          ],
+          [
+            "other_city",
+            0.2114
+          ],
+          [
+            "drought",
+            0.2072
+          ]
+        ],
+        "expected": "solar"
+      },
+      {
+        "image": "Solar_panel_field_works_near_Gitit2940.jpg",
+        "top3": [
+          [
+            "road_construction",
+            0.2905
+          ],
+          [
+            "deforestation",
+            0.285
+          ],
+          [
+            "waste",
+            0.2665
+          ]
+        ],
+        "expected": "solar"
+      },
+      {
+        "image": "Solar_panel_field_works_near_Gitit2941.jpg",
+        "top3": [
+          [
+            "road_construction",
+            0.2852
+          ],
+          [
+            "waste",
+            0.2773
+          ],
+          [
+            "deforestation",
+            0.2672
+          ]
+        ],
+        "expected": "solar"
+      },
+      {
+        "image": "A_classroom_of_children_from_rural_homes.jpg",
+        "top3": [
+          [
+            "classroom",
+            0.3318
+          ],
+          [
+            "other_indoor",
+            0.244
+          ],
+          [
+            "cleanup",
+            0.2333
+          ]
+        ],
+        "expected": "classroom"
+      },
+      {
+        "image": "A_beautiful_hand_pump_in_village_Bado__Sindh.jpg",
+        "top3": [
+          [
+            "hand_pump",
+            0.3043
+          ],
+          [
+            "flood",
+            0.3028
+          ],
+          [
+            "road_construction",
+            0.287
+          ]
+        ],
+        "expected": "hand_pump"
+      },
+      {
+        "image": "Quibdo_Garbage_dump.jpg",
+        "top3": [
+          [
+            "waste",
+            0.3103
+          ],
+          [
+            "cleanup",
+            0.2643
+          ],
+          [
+            "other_city",
+            0.2132
+          ]
+        ],
+        "expected": "waste"
+      },
+      {
+        "image": "Volunteers_participate_in_beach_debris_cleanup_-_52752007055.jpg",
+        "top3": [
+          [
+            "road_construction",
+            0.2541
+          ],
+          [
+            "cleanup",
+            0.2465
+          ],
+          [
+            "flood",
+            0.2418
+          ]
+        ],
+        "expected": "cleanup"
+      },
+      {
+        "image": "California_Drought_Dry_Lakebed_2009.jpg",
+        "top3": [
+          [
+            "drought",
+            0.3041
+          ],
+          [
+            "flood",
+            0.2693
+          ],
+          [
+            "deforestation",
+            0.2546
+          ]
+        ],
+        "expected": "drought"
+      },
+      {
+        "image": "Deforested_area__Goldisthal__2023-05-20.jpg",
+        "top3": [
+          [
+            "deforestation",
+            0.298
+          ],
+          [
+            "road_construction",
+            0.2694
+          ],
+          [
+            "waste",
+            0.2256
+          ]
+        ],
+        "expected": "deforestation"
+      }
+    ]
+  },
+  "image_similarity": {
+    "same_scene_pairs": [
+      0.8899
+    ],
+    "different_scene": {
+      "min": 0.3178,
+      "max": 0.7344,
+      "mean": 0.546
+    },
+    "my_photo_pairs": []
+  },
+  "search": {
+    "planting new trees": [
+      [
+        "Tree_Sapling_in_British_Columbia__Canada_2019.jpg",
+        0.262
+      ],
+      [
+        "Mangrove_plantation.jpg",
+        0.2544
+      ],
+      [
+        "A_beautiful_hand_pump_in_village_Bado__Sindh.jpg",
+        0.2521
+      ]
+    ],
+    "water problem in a village": [
+      [
+        "A_beautiful_hand_pump_in_village_Bado__Sindh.jpg",
+        0.2876
+      ],
+      [
+        "Solar_panel_field_works_near_Gitit2940.jpg",
+        0.2483
+      ],
+      [
+        "Road_construction_in_tea_plantation_JEG9546.jpg",
+        0.2382
+      ]
+    ],
+    "construction work on a road": [
+      [
+        "Road_construction_vehicle__Bangalore__2025_.jpg",
+        0.3054
+      ],
+      [
+        "Road_construction_in_tea_plantation_JEG9546.jpg",
+        0.2722
+      ],
+      [
+        "Solar_panel_field_works_near_Gitit2940.jpg",
+        0.2524
+      ]
+    ],
+    "trash and pollution": [
+      [
+        "Quibdo_Garbage_dump.jpg",
+        0.2666
+      ],
+      [
+        "Solar_panel_field_works_near_Gitit2940.jpg",
+        0.2186
+      ],
+      [
+        "Solar_panel_field_works_near_Gitit2941.jpg",
+        0.2153
+      ]
+    ],
+    "renewable energy": [
+      [
+        "Field_of_Solar_Panels_near_Ogwell.jpg",
+        0.2823
+      ],
+      [
+        "California_Drought_Dry_Lakebed_2009.jpg",
+        0.2352
+      ],
+      [
+        "Solar_panel_field_works_near_Gitit2940.jpg",
+        0.2303
+      ]
+    ]
+  }
+}
