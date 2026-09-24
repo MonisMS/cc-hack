@@ -16,8 +16,7 @@ _Decisions the team has already made are marked 🔒 **LOCKED**. New stack choic
 | Team brief (planning prompt) | 3 Oct 2026 | 11 Oct 2026 |
 | Organisers' email via HackCulture (pasted by team, 23 Sep) | **Submission deadline 30 Sep 2026** ("9 days to build your prototype") | Not mentioned |
 
-- **[UNVERIFIED]** Which date is binding. Check: ask in the official WhatsApp group or the HackCulture event page.
-- **[ASSUMPTION]** Until confirmed, all planning treats **30 Sep** as the hard deadline for a complete, deployed submission, and 1–11 Oct as polish time for the offline round. Planning for the earlier date is the safe choice.
+- ✅ **TEAM DECISION (24 Sep):** plan for **30 Sep 2026** as the hard deadline for a complete, deployed submission. Use 1–11 Oct for offline-round polish.
 
 ---
 
@@ -260,7 +259,9 @@ _Decisions the team has already made are marked 🔒 **LOCKED**. New stack choic
 | Embeddings | **fastembed CLIP ViT-B/32 (vision + text, 512-d)** | Benchmarked: 32 ms per image, normalised, 79% top-1 | SigLIP2 (text model 1.13 GB), jina-clip | ~580 MB of models on disk |
 | Repo | **Monorepo: backend/ + web/ + docs/** | Shared code with PS1 later | Separate repos | — |
 
-### 6.2 🟡 PROPOSED (needs team approval; options listed, recommendation first)
+### 6.2 ✅ APPROVED (team approved all recommendations on 24 Sep; alternatives kept for reference)
+
+> **Hosting update after approval:** at least one team member is a full-time student, so the backend is hosted on **Azure for Students** ($100 credit, no card) [VERIFIED: https://azure.microsoft.com/en-us/free/students]. **Laptop + Cloudflare quick tunnel** is the fallback. Still to check: the exact Azure VM size and region, and how much RAM the CLIP backend actually uses [UNVERIFIED].
 | Layer | Recommended | Option 2 | Option 3 | Why the recommendation |
 |---|---|---|---|---|
 | Database | **Neon Free + pgvector** | Supabase Free | Local Postgres | Neon doesn't pause for a week (it scales to zero and wakes in ~seconds) [VERIFIED above]. Supabase pauses after 1 week inactive. |
@@ -297,7 +298,7 @@ _Decisions the team has already made are marked 🔒 **LOCKED**. New stack choic
 6. **Account disabled if credits are exceeded** [VERIFIED].
 
 ## 8. Checks to run first (all [UNVERIFIED] above)
-1. Which deadline is binding (ask the organisers).
+1. ~~Which deadline is binding~~: resolved, **30 Sep**.
 2. Cloudinary Console → Add-ons: free quotas for Google, AWS and Imagga tagging, AI Content Analysis, AI Vision, video tagging and transcription.
 3. Does `g_auto` work on our Free account? (one test URL)
 4. Does generative AI (`e_gen_remove`) work on Free? (one test URL; costs 50 transformations)
@@ -307,4 +308,4 @@ _Decisions the team has already made are marked 🔒 **LOCKED**. New stack choic
 8. Actual RAM used by the CLIP backend (measure with `ps` once the backend loads both models).
 9. onnxruntime ARM64 wheel availability (only if Oracle is chosen).
 10. Dev B's laptop benchmark.
-11. Eligibility for Azure for Students (is either developer a full-time student?).
+11. ~~Azure for Students eligibility~~: yes, at least one full-time student. Still to do: activate the offer and confirm which VM sizes the credit covers.
