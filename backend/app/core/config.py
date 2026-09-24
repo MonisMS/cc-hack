@@ -24,5 +24,17 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     models_dir: Path = BACKEND_DIR / "models"
 
+    gemini_model: str = "gemini/gemini-2.0-flash-lite"
+    cloudinary_image_preset: str = "fp_image"
+    enable_g_auto: bool = True
+    enable_blur_faces: bool = True
+    enable_vision_descriptions: bool = False
+    credit_guard_percent: int = 80
+    framing_sim_threshold: float = 0.80
+    green_exg_threshold: float = 0.10
+    site_radius_m_default: int = 200
+    demo_mode: bool = False
+    hf_hub_offline: str = "0"
+
 
 settings = Settings()
