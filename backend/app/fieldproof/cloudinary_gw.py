@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+import logging
+import os
+from collections import deque
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable
 
 import cloudinary
 import cloudinary.api
@@ -11,7 +15,13 @@ from app.core.config import settings
 from app.core.errors import PermanentError, RetryableError
 from app.fieldproof.transforms import NamedTransform, chain
 
+log = logging.getLogger("fieldproof.cloudinary_gw")
+
 _configured = False
+
+ADMIN_BUDGET_WARN = 200
+ADMIN_BUDGET_LIMIT = 300
+_admin_calls: deque[datetime] = deque()
 
 
 def _configure() -> None:
@@ -20,22 +30,40 @@ def _configure() -> None:
         return
     if not settings.cloudinary_url:
         raise PermanentError("CLOUDINARY_URL is not configured")
-    cloudinary.config(cloudinary_url=settings.cloudinary_url, secure=True)
+    os.environ["CLOUDINARY_URL"] = settings.cloudinary_url
+    cloudinary.reset_config()
+    cloudinary.config(secure=True)
     _configured = True
+
+
+def _admin_call(name: str, fn: Callable[..., Any], *a: Any, **kw: Any) -> Any:
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=1)
+    while _admin_calls and _admin_calls[0] < cutoff:
+        _admin_calls.popleft()
+    if len(_admin_calls) >= ADMIN_BUDGET_LIMIT:
+        raise RetryableError("admin api budget")
+    if len(_admin_calls) >= ADMIN_BUDGET_WARN:
+        log.warning("cloudinary admin call budget at %s/%s", len(_admin_calls), ADMIN_BUDGET_LIMIT)
+    _admin_calls.append(now)
+    log.info("cloudinary admin call: %s", name)
+    try:
+        return fn(*a, **kw)
+    except Exception as exc:
+        _map_cld_error(exc)
+        raise
 
 
 def get_resource(public_id: str, resource_type: str = "image", **kw: Any) -> dict:
     _configure()
-    try:
-        return cloudinary.api.resource(
-            public_id,
-            resource_type=resource_type,
-            media_metadata=True,
-            **kw,
-        )
-    except Exception as exc:
-        _map_cld_error(exc)
-        raise
+    return _admin_call(
+        "resource",
+        cloudinary.api.resource,
+        public_id,
+        resource_type=resource_type,
+        media_metadata=True,
+        **kw,
+    )
 
 
 def url(
@@ -75,11 +103,7 @@ def upload_derived(data: bytes, folder: str, **kw: Any) -> dict:
 
 def usage() -> dict:
     _configure()
-    try:
-        return cloudinary.api.usage()
-    except Exception as exc:
-        _map_cld_error(exc)
-        raise
+    return _admin_call("usage", cloudinary.api.usage)
 
 
 def _map_cld_error(exc: Exception) -> None:

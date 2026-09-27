@@ -62,6 +62,25 @@ def record(
     return lineage_id
 
 
+def delete_for(entity_type: str, entity_id: UUID, output_kinds: list[str]) -> None:
+    engine = get_engine()
+    if engine is None:
+        raise RuntimeError("DATABASE_URL is not configured")
+    if not output_kinds:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                DELETE FROM lineage
+                WHERE entity_type = :t AND entity_id = :id
+                  AND output_kind = ANY(CAST(:kinds AS text[]))
+                """
+            ),
+            {"t": entity_type, "id": str(entity_id), "kinds": _pg_text_array(output_kinds)},
+        )
+
+
 def for_entity(entity_type: str, entity_id: UUID) -> list[dict[str, Any]]:
     engine = get_engine()
     if engine is None:

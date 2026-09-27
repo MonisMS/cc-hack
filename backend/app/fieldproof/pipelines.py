@@ -58,22 +58,27 @@ def analyze_asset(payload: dict[str, Any]) -> None:
     resource_type = row["resource_type"]
     public_id = row["cld_public_id"]
 
-    try:
-        resource = cloudinary_gw.get_resource(public_id, resource_type)
-    except PermanentError as exc:
-        _mark_failed(asset_id, str(exc))
-        raise
-    except RetryableError:
-        raise
+    if row["media_metadata"] is not None:
+        resource: dict[str, Any] = {}
+        image_metadata = row["media_metadata"] or {}
+        detection = row["cld_detection"] or {}
+    else:
+        try:
+            resource = cloudinary_gw.get_resource(public_id, resource_type)
+        except PermanentError as exc:
+            _mark_failed(asset_id, str(exc))
+            raise
+        except RetryableError:
+            raise
+        image_metadata = resource.get("media_metadata") or resource.get("image_metadata") or {}
+        detection = _detection_node(resource)
 
-    image_metadata = resource.get("image_metadata") or {}
-    detection = _detection_node(resource)
     parsed = metadata.parse_media_metadata(
-        {"image_metadata": image_metadata, **resource},
+        {"image_metadata": image_metadata},
         upload_time=row["created_at"] or datetime.now(timezone.utc),
         project_started_on=started_on,
-        device_lat=payload.get("device_lat", row["lat"]),
-        device_lng=payload.get("device_lng", row["lng"]),
+        device_lat=payload.get("device_lat"),
+        device_lng=payload.get("device_lng"),
     )
 
     try:
@@ -88,7 +93,18 @@ def analyze_asset(payload: dict[str, Any]) -> None:
     mean_vec = embeddings.l2(vecs.mean(axis=0))
     clip_tags = embeddings.zero_shot(mean_vec)
     det_tags = _detection_tags(detection)
-    site_id = sites.assign_site(UUID(str(row["project_id"])), parsed.lat, parsed.lng)
+
+    if row["location_source"] == "manual":
+        site_id = UUID(str(row["site_id"])) if row["site_id"] else None
+        upd_lat, upd_lng, upd_location_source = row["lat"], row["lng"], row["location_source"]
+    else:
+        site_id = sites.assign_site(UUID(str(row["project_id"])), parsed.lat, parsed.lng)
+        upd_lat, upd_lng, upd_location_source = parsed.lat, parsed.lng, parsed.location_source
+
+    if row["captured_at_source"] == "manual":
+        upd_captured_at, upd_captured_at_source = row["captured_at"], row["captured_at_source"]
+    else:
+        upd_captured_at, upd_captured_at_source = parsed.captured_at, parsed.captured_at_source
 
     analysis_url = cloudinary_gw.url(public_id, NamedTransform.ANALYSIS, resource_type="image")
     if resource_type == "video":
@@ -169,11 +185,11 @@ def analyze_asset(payload: dict[str, Any]) -> None:
                 {
                     "id": str(asset_id),
                     "site_id": str(site_id) if site_id else None,
-                    "captured_at": parsed.captured_at,
-                    "captured_at_source": parsed.captured_at_source,
-                    "lat": parsed.lat,
-                    "lng": parsed.lng,
-                    "location_source": parsed.location_source,
+                    "captured_at": upd_captured_at,
+                    "captured_at_source": upd_captured_at_source,
+                    "lat": upd_lat,
+                    "lng": upd_lng,
+                    "location_source": upd_location_source,
                     "media_metadata": _json(image_metadata),
                     "cld_detection": _json(detection),
                 },
@@ -181,6 +197,7 @@ def analyze_asset(payload: dict[str, Any]) -> None:
     except OperationalError as exc:
         raise RetryableError(str(exc)) from exc
 
+    lineage.delete_for("asset", asset_id, ["analysis", "embedding", "tags"])
     lineage.record(
         "analysis",
         analysis_url,
@@ -312,6 +329,10 @@ def _detection_tags(detection: dict) -> list[tuple[str, float]]:
     for tag, score in found:
         best[tag] = max(score, best.get(tag, 0.0))
     return list(best.items())
+
+
+def on_analyze_asset_failed(payload: dict[str, Any], error: str) -> None:
+    _mark_failed(UUID(str(payload["asset_id"])), error)
 
 
 def _mark_failed(asset_id: UUID, error: str) -> None:
