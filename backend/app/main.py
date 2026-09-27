@@ -1,8 +1,17 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.db import check_database
+from app.core.errors import ApiError
+from app.fieldproof.routes import router
+
+log = logging.getLogger("fieldproof.main")
 
 app = FastAPI(title="FieldProof API", version="0.1.0")
 
@@ -12,6 +21,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(router)
+
+
+def _envelope(code: str, message: str, details: object = None) -> dict:
+    return {"error": {"code": code, "message": message, "details": details if details is not None else {}}}
+
+
+@app.exception_handler(ApiError)
+def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status, content=_envelope(exc.code, exc.message, exc.details))
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content=_envelope("VALIDATION_ERROR", "invalid request", jsonable_encoder(exc.errors())),
+    )
+
+
+@app.exception_handler(Exception)
+def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    log.exception("unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content=_envelope("INTERNAL", "internal server error"))
 
 
 def _clip_models_downloaded() -> bool:
