@@ -302,6 +302,18 @@ def _detection_node(resource: dict) -> dict:
 def _detection_tags(detection: dict) -> list[tuple[str, float]]:
     found: list[tuple[str, float]] = []
 
+    def add(tag: Any, conf: Any) -> None:
+        if not tag or conf is None:
+            return
+        try:
+            score = float(conf)
+        except (TypeError, ValueError):
+            return
+        if score > 1:
+            score = score / 100.0
+        if score >= DETECTION_MIN_CONF:
+            found.append((str(tag).lower(), score))
+
     def walk(node: Any) -> None:
         if isinstance(node, list):
             for item in node:
@@ -309,17 +321,20 @@ def _detection_tags(detection: dict) -> list[tuple[str, float]]:
             return
         if not isinstance(node, dict):
             return
+        # coco_v2's real shape: {"tags": {"<label>": [{"confidence": 95.3, ...}, ...]}}
+        tags_node = node.get("tags")
+        if isinstance(tags_node, dict):
+            for label, dets in tags_node.items():
+                dets_list = dets if isinstance(dets, list) else [dets]
+                for det in dets_list:
+                    if isinstance(det, dict):
+                        add(label, det.get("confidence") or det.get("score") or det.get("percent"))
+                    else:
+                        add(label, det)
+        # fallback shape some detection add-ons use: {"tag"/"name"/"label": ..., "confidence": ...}
         tag = node.get("tag") or node.get("name") or node.get("label")
         conf = node.get("confidence") or node.get("score") or node.get("percent")
-        if tag and conf is not None:
-            try:
-                score = float(conf)
-            except (TypeError, ValueError):
-                score = 0.0
-            if score > 1:
-                score = score / 100.0
-            if score >= DETECTION_MIN_CONF:
-                found.append((str(tag).lower(), score))
+        add(tag, conf)
         for val in node.values():
             walk(val)
 
