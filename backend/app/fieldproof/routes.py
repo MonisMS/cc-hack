@@ -14,8 +14,16 @@ from app.core.db import get_engine
 from app.core.errors import ApiError
 from app.core.jobs import enqueue
 from app.fieldproof import assets as assets_module
+from app.fieldproof import search as search_module
 from app.fieldproof import sites, urls
-from app.fieldproof.schemas import AssetPatch, AssetRegister, ProjectCreate, SiteCreate, SitePatch
+from app.fieldproof.schemas import (
+    AssetPatch,
+    AssetRegister,
+    ProjectCreate,
+    SearchRequest,
+    SiteCreate,
+    SitePatch,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -424,6 +432,31 @@ def reprocess_asset(asset_id: UUID) -> dict:
         _get_asset_row(conn, asset_id)
     job_id = enqueue("analyze_asset", {"asset_id": str(asset_id)})
     return {"job_id": job_id}
+
+
+@router.post("/search")
+def do_search(body: SearchRequest) -> dict:
+    hits = search_module.search(body)
+    if not hits:
+        return {"items": []}
+
+    with _engine().connect() as conn:
+        rows = conn.execute(
+            text(f"{_ASSET_SELECT} WHERE a.id = ANY(CAST(:ids AS uuid[]))").bindparams(
+                bindparam("ids", type_=ARRAY(String))
+            ),
+            {"ids": [str(h.asset_id) for h in hits]},
+        ).mappings().all()
+        tags_by_asset = _bulk_tags(conn, [r["id"] for r in rows])
+
+    rows_by_id = {str(r["id"]): r for r in rows}
+    items = []
+    for h in hits:
+        row = rows_by_id.get(str(h.asset_id))
+        if row is None:
+            continue
+        items.append({"asset": _asset_card(row, tags_by_asset.get(str(row["id"]), [])), "score": h.score})
+    return {"items": items}
 
 
 @router.get("/jobs/{job_id}")

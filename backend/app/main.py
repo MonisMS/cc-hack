@@ -1,4 +1,6 @@
 import logging
+import threading
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -13,7 +15,24 @@ from app.fieldproof.routes import router
 
 log = logging.getLogger("fieldproof.main")
 
-app = FastAPI(title="FieldProof API", version="0.1.0")
+
+def _warm_text_model() -> None:
+    try:
+        from app.fieldproof import embeddings
+
+        embeddings.embed_text("warm up")
+        log.info("text embedding model warmed up")
+    except Exception:
+        log.exception("text embedding model warm-up failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=_warm_text_model, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="FieldProof API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
