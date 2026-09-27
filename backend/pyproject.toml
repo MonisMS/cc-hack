@@ -28,3 +28,4 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = ["integration: hits the real Neon DB with real CLIP embeddings; skipped when there's no ready data"]
