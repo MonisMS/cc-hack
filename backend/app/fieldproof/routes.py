@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,9 +16,11 @@ from app.core.db import get_engine
 from app.core.errors import ApiError
 from app.core.jobs import enqueue
 from app.fieldproof import assets as assets_module
-from app.fieldproof import change, sites, urls
+from app.fieldproof import change, cloudinary_gw, lineage, sites, urls
 from app.fieldproof import pairs as pairs_module
 from app.fieldproof import search as search_module
+
+log = logging.getLogger("fieldproof.routes")
 from app.fieldproof.schemas import (
     AssetPatch,
     AssetRegister,
@@ -814,3 +817,135 @@ def list_project_reports(project_id: UUID) -> dict:
         ).mappings().all()
         items = [_report_response(conn, r) for r in rows]
     return {"items": items}
+
+
+# ---- campaign kit + lineage -------------------------------------------------
+
+
+@router.get("/reports/{report_id}/campaign-kit")
+def campaign_kit(report_id: UUID) -> dict:
+    with _engine().connect() as conn:
+        report_row = conn.execute(
+            text("SELECT id FROM reports WHERE id = :id"), {"id": str(report_id)}
+        ).mappings().first()
+        if report_row is None:
+            raise ApiError("NOT_FOUND", f"report {report_id} not found", 404)
+
+        resp = cloudinary_gw.cached_usage()
+        if resp is not None:
+            log.info("cloudinary usage (campaign-kit credit guard): %s", resp)
+            used_percent = (resp.get("credits") or {}).get("used_percent")
+            if used_percent is not None and used_percent >= settings.credit_guard_percent:
+                raise ApiError("CREDIT_GUARD", "cloudinary credit usage guard tripped", 503)
+
+        item_rows = conn.execute(
+            text(
+                """
+                SELECT position, kind, asset_id, comparison_id
+                FROM report_items WHERE report_id = :id ORDER BY position
+                """
+            ),
+            {"id": str(report_id)},
+        ).mappings().all()
+
+        evidence_asset_ids: list[UUID] = []
+        seen: set[str] = set()
+        for r in item_rows:
+            if r["kind"] == "asset" and r["asset_id"] and str(r["asset_id"]) not in seen:
+                seen.add(str(r["asset_id"]))
+                evidence_asset_ids.append(r["asset_id"])
+            if len(evidence_asset_ids) == 3:
+                break
+        comparison_ids = [r["comparison_id"] for r in item_rows if r["kind"] == "comparison" and r["comparison_id"]]
+
+        items: list[dict] = []
+
+        if comparison_ids:
+            crows = conn.execute(
+                text(f"{_COMPARISON_SELECT} WHERE c.id = ANY(CAST(:ids AS uuid[]))").bindparams(
+                    bindparam("ids", type_=ARRAY(String))
+                ),
+                {"ids": [str(i) for i in comparison_ids]},
+            ).mappings().all()
+            for c in crows:
+                before_row = _get_asset_row(conn, UUID(str(c["before_asset_id"])))
+                after_row = _get_asset_row(conn, UUID(str(c["after_asset_id"])))
+                items.append(
+                    {
+                        "kind": "collage",
+                        "url": urls.collage_url(before_row, after_row),
+                        "source_asset_ids": [str(before_row["id"]), str(after_row["id"])],
+                        "transformation": "COLLAGE",
+                    }
+                )
+
+        if evidence_asset_ids:
+            arows = conn.execute(
+                text(f"{_ASSET_SELECT} WHERE a.id = ANY(CAST(:ids AS uuid[]))").bindparams(
+                    bindparam("ids", type_=ARRAY(String))
+                ),
+                {"ids": [str(i) for i in evidence_asset_ids]},
+            ).mappings().all()
+            rows_by_id = {str(r["id"]): r for r in arows}
+            for asset_id in evidence_asset_ids:
+                row = rows_by_id.get(str(asset_id))
+                if row is None:
+                    continue
+                items.append(
+                    {
+                        "kind": "social_square",
+                        "url": urls.square_url(row),
+                        "source_asset_ids": [str(row["id"])],
+                        "transformation": "SQUARE",
+                    }
+                )
+                items.append(
+                    {
+                        "kind": "social_story",
+                        "url": urls.story_url(row),
+                        "source_asset_ids": [str(row["id"])],
+                        "transformation": "STORY",
+                    }
+                )
+
+        if not lineage.for_entity("kit", report_id):
+            for item in items:
+                lineage.record(
+                    item["kind"],
+                    item["url"],
+                    sources=[UUID(i) for i in item["source_asset_ids"]],
+                    tool="cloudinary",
+                    transformation=item["transformation"],
+                    entity=("kit", report_id),
+                )
+
+    return {"items": items}
+
+
+_LINEAGE_ENTITY_TYPES = {"asset", "comparison", "report", "kit"}
+
+
+def _lineage_dict(row: dict) -> dict:
+    return {
+        "id": str(row["id"]),
+        "entity_type": row["entity_type"],
+        "entity_id": str(row["entity_id"]),
+        "output_kind": row["output_kind"],
+        "output_ref": row["output_ref"],
+        "source_asset_ids": [str(i) for i in (row["source_asset_ids"] or [])],
+        "source_public_ids": row["source_public_ids"] or [],
+        "source_versions": row["source_versions"] or [],
+        "tool": row["tool"],
+        "transformation": row["transformation"],
+        "model": row["model"],
+        "params": row["params"] or {},
+        "created_at": row["created_at"],
+    }
+
+
+@router.get("/lineage")
+def get_lineage(entity_type: str, entity_id: UUID) -> dict:
+    if entity_type not in _LINEAGE_ENTITY_TYPES:
+        raise ApiError("VALIDATION_ERROR", f"entity_type must be one of {sorted(_LINEAGE_ENTITY_TYPES)}", 422)
+    records = lineage.for_entity(entity_type, entity_id)
+    return {"items": [_lineage_dict(r) for r in records]}

@@ -115,6 +115,28 @@ def usage() -> dict:
     return _admin_call("usage", cloudinary.api.usage)
 
 
+USAGE_CACHE_SECONDS = 600
+_usage_cache: dict[str, Any] | None = None
+_usage_cache_at: datetime | None = None
+
+
+def cached_usage() -> dict | None:
+    """usage() cached for USAGE_CACHE_SECONDS. Fails open: returns the last known value
+    (or None) if a fresh call isn't due or the call itself fails."""
+    global _usage_cache, _usage_cache_at
+    now = datetime.now(timezone.utc)
+    if _usage_cache_at is not None and (now - _usage_cache_at).total_seconds() < USAGE_CACHE_SECONDS:
+        return _usage_cache
+    try:
+        resp = usage()
+    except Exception:
+        log.warning("cloudinary usage() failed; credit guard fails open", exc_info=True)
+        return _usage_cache
+    _usage_cache = resp
+    _usage_cache_at = now
+    return resp
+
+
 def _map_cld_error(exc: Exception) -> None:
     msg = str(exc)
     status = getattr(exc, "http_code", None) or getattr(exc, "code", None)

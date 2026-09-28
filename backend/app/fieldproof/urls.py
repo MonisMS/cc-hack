@@ -22,3 +22,20 @@ def analysis_url(row: Any) -> str:
 
 def mask_url(public_id: str) -> str:
     return cloudinary_gw.raw_url(public_id, [{"fetch_format": "auto", "quality": "auto"}])
+
+
+def square_url(row: Any) -> str:
+    return cloudinary_gw.url(row["cld_public_id"], NamedTransform.SQUARE, resource_type=row["resource_type"])
+
+
+def story_url(row: Any) -> str:
+    return cloudinary_gw.url(row["cld_public_id"], NamedTransform.STORY, resource_type=row["resource_type"])
+
+
+def collage_url(before_row: Any, after_row: Any) -> str:
+    return cloudinary_gw.url(
+        before_row["cld_public_id"],
+        NamedTransform.COLLAGE,
+        resource_type=before_row["resource_type"],
+        after_public_id=after_row["cld_public_id"],
+    )
