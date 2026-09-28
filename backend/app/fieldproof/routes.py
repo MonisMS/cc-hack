@@ -10,16 +10,20 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import String, bindparam, text
 from sqlalchemy.dialects.postgresql import ARRAY
 
+from app.core.config import settings
 from app.core.db import get_engine
 from app.core.errors import ApiError
 from app.core.jobs import enqueue
 from app.fieldproof import assets as assets_module
+from app.fieldproof import change, sites, urls
+from app.fieldproof import pairs as pairs_module
 from app.fieldproof import search as search_module
-from app.fieldproof import sites, urls
 from app.fieldproof.schemas import (
     AssetPatch,
     AssetRegister,
+    ComparisonCreate,
     ProjectCreate,
+    ReportCreate,
     SearchRequest,
     SiteCreate,
     SitePatch,
@@ -197,6 +201,51 @@ def patch_site(site_id: UUID, body: SitePatch) -> dict:
             {"id": str(site_id)},
         ).mappings().first()
     return _site_dict(row)
+
+
+@router.get("/sites/{site_id}/pair-suggestions")
+def pair_suggestions(site_id: UUID) -> dict:
+    with _engine().connect() as conn:
+        row = conn.execute(
+            text(f"{_SITE_SELECT} WHERE s.id = :id GROUP BY s.id"),
+            {"id": str(site_id)},
+        ).mappings().first()
+        if row is None:
+            raise ApiError("NOT_FOUND", f"site {site_id} not found", 404)
+
+        candidates = pairs_module.pair_suggestions(site_id)
+        asset_ids = [c.before_id for c in candidates] + [c.after_id for c in candidates]
+        rows = (
+            conn.execute(
+                text(f"{_ASSET_SELECT} WHERE a.id = ANY(CAST(:ids AS uuid[]))").bindparams(
+                    bindparam("ids", type_=ARRAY(String))
+                ),
+                {"ids": [str(i) for i in asset_ids]},
+            )
+            .mappings()
+            .all()
+            if asset_ids
+            else []
+        )
+        rows_by_id = {str(r["id"]): r for r in rows}
+        tags_by_asset = _bulk_tags(conn, [r["id"] for r in rows])
+
+    items = []
+    for c in candidates:
+        before_row = rows_by_id.get(str(c.before_id))
+        after_row = rows_by_id.get(str(c.after_id))
+        if before_row is None or after_row is None:
+            continue
+        items.append(
+            {
+                "before": _asset_card(before_row, tags_by_asset.get(str(before_row["id"]), [])),
+                "after": _asset_card(after_row, tags_by_asset.get(str(after_row["id"]), [])),
+                "image_similarity": c.image_similarity,
+                "framing_warning": c.image_similarity < settings.framing_sim_threshold,
+                "days_apart": c.days_apart,
+            }
+        )
+    return {"items": items}
 
 
 # ---- assets -----------------------------------------------------------------
@@ -475,3 +524,293 @@ def get_job(job_id: int) -> dict:
     if row is None:
         raise ApiError("NOT_FOUND", f"job {job_id} not found", 404)
     return dict(row)
+
+
+# ---- comparisons --------------------------------------------------------------
+
+_COMPARISON_SELECT = """
+    SELECT c.*, sit.name AS site_name
+    FROM comparisons c
+    JOIN sites sit ON sit.id = c.site_id
+"""
+
+
+def _comparison_response(conn, comp_row) -> dict:
+    before_row = _get_asset_row(conn, UUID(str(comp_row["before_asset_id"])))
+    after_row = _get_asset_row(conn, UUID(str(comp_row["after_asset_id"])))
+    tags_by_asset = _bulk_tags(conn, [before_row["id"], after_row["id"]])
+    before_card = _asset_card(before_row, tags_by_asset.get(str(before_row["id"]), []))
+    after_card = _asset_card(after_row, tags_by_asset.get(str(after_row["id"]), []))
+
+    days_apart = None
+    if before_row["captured_at"] and after_row["captured_at"]:
+        days_apart = (after_row["captured_at"] - before_row["captured_at"]).days
+
+    return {
+        "id": str(comp_row["id"]),
+        "site_id": str(comp_row["site_id"]),
+        "site_name": comp_row["site_name"],
+        "status": comp_row["status"],
+        "before": before_card,
+        "after": after_card,
+        "before_compare_url": urls.compare_url(before_row),
+        "after_compare_url": urls.compare_url(after_row),
+        "before_mask_url": urls.mask_url(comp_row["before_mask_public_id"])
+        if comp_row["before_mask_public_id"]
+        else None,
+        "after_mask_url": urls.mask_url(comp_row["after_mask_public_id"])
+        if comp_row["after_mask_public_id"]
+        else None,
+        "image_similarity": comp_row["image_similarity"],
+        "framing_warning": comp_row["framing_warning"],
+        "before_green_pct_rounded": change.round5(comp_row["before_green_pct"])
+        if comp_row["before_green_pct"] is not None
+        else None,
+        "after_green_pct_rounded": change.round5(comp_row["after_green_pct"])
+        if comp_row["after_green_pct"] is not None
+        else None,
+        "delta_green_pct_rounded": comp_row["delta_green_pct_rounded"],
+        "days_apart": days_apart,
+        "description": comp_row["description"],
+        "description_model": comp_row["description_model"],
+        "created_at": comp_row["created_at"],
+    }
+
+
+@router.post("/comparisons", status_code=202)
+def create_comparison(body: ComparisonCreate) -> dict:
+    with _engine().begin() as conn:
+        site = conn.execute(
+            text(f"{_SITE_SELECT} WHERE s.id = :id GROUP BY s.id"), {"id": str(body.site_id)}
+        ).mappings().first()
+        if site is None:
+            raise ApiError("NOT_FOUND", f"site {body.site_id} not found", 404)
+
+        before_row = _get_asset_row(conn, body.before_asset_id)
+        after_row = _get_asset_row(conn, body.after_asset_id)
+        for label, row in (("before_asset_id", before_row), ("after_asset_id", after_row)):
+            if row["status"] != "ready" or row["resource_type"] != "image":
+                raise ApiError("VALIDATION_ERROR", f"{label} must be a ready image asset", 422)
+            if str(row["site_id"]) != str(body.site_id):
+                raise ApiError("VALIDATION_ERROR", f"{label} is not at site {body.site_id}", 422)
+
+        sim_row = conn.execute(
+            text(
+                """
+                SELECT 1 - (be.embedding <=> ae.embedding) AS image_similarity
+                FROM asset_embeddings be, asset_embeddings ae
+                WHERE be.asset_id = :before_id AND be.frame_s = 0
+                  AND ae.asset_id = :after_id AND ae.frame_s = 0
+                """
+            ),
+            {"before_id": str(body.before_asset_id), "after_id": str(body.after_asset_id)},
+        ).mappings().first()
+        if sim_row is None:
+            raise ApiError("VALIDATION_ERROR", "both assets must have embeddings", 422)
+        image_similarity = float(sim_row["image_similarity"])
+
+        comparison_id = uuid4()
+        conn.execute(
+            text(
+                """
+                INSERT INTO comparisons (
+                    id, site_id, before_asset_id, after_asset_id,
+                    image_similarity, framing_warning, status
+                ) VALUES (
+                    :id, :site_id, :before_asset_id, :after_asset_id,
+                    :image_similarity, :framing_warning, 'pending'
+                )
+                """
+            ),
+            {
+                "id": str(comparison_id),
+                "site_id": str(body.site_id),
+                "before_asset_id": str(body.before_asset_id),
+                "after_asset_id": str(body.after_asset_id),
+                "image_similarity": image_similarity,
+                "framing_warning": image_similarity < settings.framing_sim_threshold,
+            },
+        )
+    job_id = enqueue("build_comparison", {"comparison_id": str(comparison_id)})
+    return {"comparison_id": str(comparison_id), "status": "pending", "job_id": job_id}
+
+
+@router.get("/comparisons/{comparison_id}")
+def get_comparison(comparison_id: UUID) -> dict:
+    with _engine().connect() as conn:
+        row = conn.execute(
+            text(f"{_COMPARISON_SELECT} WHERE c.id = :id"), {"id": str(comparison_id)}
+        ).mappings().first()
+        if row is None:
+            raise ApiError("NOT_FOUND", f"comparison {comparison_id} not found", 404)
+        return _comparison_response(conn, row)
+
+
+@router.get("/sites/{site_id}/comparisons")
+def list_site_comparisons(site_id: UUID) -> dict:
+    with _engine().connect() as conn:
+        site = conn.execute(
+            text(f"{_SITE_SELECT} WHERE s.id = :id GROUP BY s.id"), {"id": str(site_id)}
+        ).mappings().first()
+        if site is None:
+            raise ApiError("NOT_FOUND", f"site {site_id} not found", 404)
+        rows = conn.execute(
+            text(f"{_COMPARISON_SELECT} WHERE c.site_id = :site_id ORDER BY c.created_at DESC"),
+            {"site_id": str(site_id)},
+        ).mappings().all()
+        items = [_comparison_response(conn, r) for r in rows]
+    return {"items": items}
+
+
+@router.get("/projects/{project_id}/comparisons")
+def list_project_comparisons(project_id: UUID, status: str | None = None) -> dict:
+    with _engine().connect() as conn:
+        _get_project_row(conn, project_id)
+        where = ["sit.project_id = :project_id"]
+        params: dict[str, Any] = {"project_id": str(project_id)}
+        if status is not None:
+            where.append("c.status = :status")
+            params["status"] = status
+        sql = f"""
+            SELECT c.*, sit.name AS site_name
+            FROM comparisons c
+            JOIN sites sit ON sit.id = c.site_id
+            WHERE {' AND '.join(where)}
+            ORDER BY c.created_at DESC
+        """
+        rows = conn.execute(text(sql), params).mappings().all()
+        items = [_comparison_response(conn, r) for r in rows]
+    return {"items": items}
+
+
+# ---- reports --------------------------------------------------------------
+
+
+def _report_response(conn, row) -> dict:
+    item_rows = conn.execute(
+        text(
+            """
+            SELECT position, kind, section, asset_id, comparison_id
+            FROM report_items WHERE report_id = :id ORDER BY position
+            """
+        ),
+        {"id": str(row["id"])},
+    ).mappings().all()
+
+    asset_ids = [r["asset_id"] for r in item_rows if r["asset_id"]]
+    comparison_ids = [r["comparison_id"] for r in item_rows if r["comparison_id"]]
+
+    assets_by_id: dict[str, dict] = {}
+    if asset_ids:
+        arows = conn.execute(
+            text(f"{_ASSET_SELECT} WHERE a.id = ANY(CAST(:ids AS uuid[]))").bindparams(
+                bindparam("ids", type_=ARRAY(String))
+            ),
+            {"ids": [str(i) for i in asset_ids]},
+        ).mappings().all()
+        tags_by_asset = _bulk_tags(conn, [r["id"] for r in arows])
+        assets_by_id = {str(r["id"]): _asset_card(r, tags_by_asset.get(str(r["id"]), [])) for r in arows}
+
+    comparisons_by_id: dict[str, dict] = {}
+    if comparison_ids:
+        crows = conn.execute(
+            text(f"{_COMPARISON_SELECT} WHERE c.id = ANY(CAST(:ids AS uuid[]))").bindparams(
+                bindparam("ids", type_=ARRAY(String))
+            ),
+            {"ids": [str(i) for i in comparison_ids]},
+        ).mappings().all()
+        comparisons_by_id = {str(r["id"]): _comparison_response(conn, r) for r in crows}
+
+    items = [
+        {
+            "position": r["position"],
+            "kind": r["kind"],
+            "section": r["section"],
+            "asset": assets_by_id.get(str(r["asset_id"])) if r["asset_id"] else None,
+            "comparison": comparisons_by_id.get(str(r["comparison_id"])) if r["comparison_id"] else None,
+        }
+        for r in item_rows
+    ]
+
+    return {
+        "id": str(row["id"]),
+        "project_id": str(row["project_id"]),
+        "status": row["status"],
+        "date_from": row["date_from"].isoformat() if row["date_from"] else None,
+        "date_to": row["date_to"].isoformat() if row["date_to"] else None,
+        "metrics": row["metrics"] or {},
+        "summary": row["summary"],
+        "summary_model": row["summary_model"],
+        "items": items,
+        "created_at": row["created_at"],
+    }
+
+
+@router.post("/reports", status_code=202)
+def create_report(body: ReportCreate) -> dict:
+    with _engine().begin() as conn:
+        _get_project_row(conn, body.project_id)
+        if body.comparison_ids:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT c.id FROM comparisons c
+                    JOIN sites sit ON sit.id = c.site_id
+                    WHERE sit.project_id = :project_id AND c.status = 'ready'
+                      AND c.id = ANY(CAST(:ids AS uuid[]))
+                    """
+                ).bindparams(bindparam("ids", type_=ARRAY(String))),
+                {"project_id": str(body.project_id), "ids": [str(i) for i in body.comparison_ids]},
+            ).mappings().all()
+            found_ids = {str(r["id"]) for r in rows}
+            missing = [str(i) for i in body.comparison_ids if str(i) not in found_ids]
+            if missing:
+                raise ApiError(
+                    "VALIDATION_ERROR",
+                    f"comparison_ids not found or not ready in this project: {missing}",
+                    422,
+                )
+
+        report_id = uuid4()
+        conn.execute(
+            text(
+                """
+                INSERT INTO reports (id, project_id, date_from, date_to, status)
+                VALUES (:id, :project_id, :date_from, :date_to, 'pending')
+                """
+            ),
+            {
+                "id": str(report_id),
+                "project_id": str(body.project_id),
+                "date_from": body.date_from,
+                "date_to": body.date_to,
+            },
+        )
+    job_id = enqueue(
+        "generate_report",
+        {"report_id": str(report_id), "comparison_ids": [str(i) for i in body.comparison_ids]},
+    )
+    return {"report_id": str(report_id), "status": "pending", "job_id": job_id}
+
+
+@router.get("/reports/{report_id}")
+def get_report(report_id: UUID) -> dict:
+    with _engine().connect() as conn:
+        row = conn.execute(
+            text("SELECT * FROM reports WHERE id = :id"), {"id": str(report_id)}
+        ).mappings().first()
+        if row is None:
+            raise ApiError("NOT_FOUND", f"report {report_id} not found", 404)
+        return _report_response(conn, row)
+
+
+@router.get("/projects/{project_id}/reports")
+def list_project_reports(project_id: UUID) -> dict:
+    with _engine().connect() as conn:
+        _get_project_row(conn, project_id)
+        rows = conn.execute(
+            text("SELECT * FROM reports WHERE project_id = :id ORDER BY created_at DESC"),
+            {"id": str(project_id)},
+        ).mappings().all()
+        items = [_report_response(conn, r) for r in rows]
+    return {"items": items}

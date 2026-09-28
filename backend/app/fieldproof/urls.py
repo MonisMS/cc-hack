@@ -18,3 +18,7 @@ def compare_url(row: Any) -> str:
 
 def analysis_url(row: Any) -> str:
     return cloudinary_gw.url(row["cld_public_id"], NamedTransform.ANALYSIS, resource_type=row["resource_type"])
+
+
+def mask_url(public_id: str) -> str:
+    return cloudinary_gw.raw_url(public_id, [{"fetch_format": "auto", "quality": "auto"}])

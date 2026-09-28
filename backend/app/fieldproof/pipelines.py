@@ -9,18 +9,63 @@ from uuid import UUID
 import httpx
 import numpy as np
 from PIL import Image, ImageOps
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from app.core.config import CLIP_VISION_MODEL
+from app.core import llm
+from app.core.config import CLIP_VISION_MODEL, settings
 from app.core.db import get_engine
 from app.core.errors import PermanentError, RetryableError
-from app.fieldproof import cloudinary_gw, embeddings, lineage, metadata, sites
+from app.fieldproof import (
+    change,
+    cloudinary_gw,
+    embeddings,
+    lineage,
+    metadata,
+    reports,
+    sites,
+    urls,
+)
 from app.fieldproof.transforms import NamedTransform
 
 log = logging.getLogger("fieldproof.pipelines")
 
 DETECTION_MIN_CONF = 0.6
+
+CHANGE_DESCRIPTION_TEMPLATE = (
+    "At {site}, estimated green cover changed from {before}% to {after}% ({delta} points) over {days} days."
+)
+
+CHANGE_DESCRIPTION_PROMPT = (
+    "Write ONE short sentence for a conservation report describing a change in green vegetation "
+    "cover at a site. You MUST use these exact placeholder tokens in your sentence instead of any "
+    "literal numbers: {site}, {before}, {after}, {delta}, {days}. Never write a digit yourself; the "
+    "placeholders are substituted afterward with the real values. "
+    'Respond with JSON only: {"sentence": "..."}.'
+)
+
+
+class ChangeDescription(BaseModel):
+    sentence: str
+
+
+class ReportSummary(BaseModel):
+    headline: str
+    paragraphs: list[str] = Field(min_length=2, max_length=3)
+    highlights: list[str] = Field(min_length=3, max_length=5)
+
+
+def _report_summary_prompt(placeholders: dict[str, Any]) -> str:
+    names = ", ".join("{" + k + "}" for k in placeholders)
+    return (
+        "Write a short summary for a community conservation report, given field evidence metrics. "
+        "You MUST use only these exact placeholder tokens for any numbers or site names in your text "
+        f"— never write a digit or a proper name yourself: {names}. "
+        'Respond with JSON only: {"headline": "...", "paragraphs": ["...", "..."], '
+        '"highlights": ["...", "...", "..."]}. paragraphs must have 2 to 3 entries; '
+        "highlights must have 3 to 5 entries."
+    )
 
 
 def analyze_asset(payload: dict[str, Any]) -> None:
@@ -346,6 +391,198 @@ def _detection_tags(detection: dict) -> list[tuple[str, float]]:
     return list(best.items())
 
 
+def build_comparison(payload: dict[str, Any]) -> None:
+    comparison_id = UUID(str(payload["comparison_id"]))
+    engine = get_engine()
+    if engine is None:
+        raise RetryableError("database not configured")
+
+    try:
+        with engine.begin() as conn:
+            comparison = conn.execute(
+                text("SELECT * FROM comparisons WHERE id = :id"),
+                {"id": str(comparison_id)},
+            ).mappings().first()
+            if comparison is None:
+                raise PermanentError(f"comparison {comparison_id} not found")
+            before_row = conn.execute(
+                text("SELECT * FROM assets WHERE id = :id"),
+                {"id": str(comparison["before_asset_id"])},
+            ).mappings().first()
+            after_row = conn.execute(
+                text("SELECT * FROM assets WHERE id = :id"),
+                {"id": str(comparison["after_asset_id"])},
+            ).mappings().first()
+            site = conn.execute(
+                text("SELECT name FROM sites WHERE id = :id"),
+                {"id": str(comparison["site_id"])},
+            ).mappings().first()
+            conn.execute(
+                text("UPDATE comparisons SET status = 'processing' WHERE id = :id"),
+                {"id": str(comparison_id)},
+            )
+    except OperationalError as exc:
+        raise RetryableError(str(exc)) from exc
+
+    if before_row is None or after_row is None:
+        raise PermanentError("before/after asset not found")
+
+    before_compare_url = cloudinary_gw.url(before_row["cld_public_id"], NamedTransform.COMPARE, resource_type="image")
+    after_compare_url = cloudinary_gw.url(after_row["cld_public_id"], NamedTransform.COMPARE, resource_type="image")
+
+    before_img = _download_image(before_compare_url)
+    after_img = _download_image(after_compare_url)
+
+    before_result = change.green_cover(before_img)
+    after_result = change.green_cover(after_img)
+
+    before_upload = cloudinary_gw.upload_derived(
+        before_result.mask_png,
+        folder="fieldproof/derived/masks",
+        public_id=f"{comparison_id}_before",
+        overwrite=True,
+    )
+    after_upload = cloudinary_gw.upload_derived(
+        after_result.mask_png,
+        folder="fieldproof/derived/masks",
+        public_id=f"{comparison_id}_after",
+        overwrite=True,
+    )
+    before_mask_public_id = before_upload["public_id"]
+    after_mask_public_id = after_upload["public_id"]
+
+    before_rounded = change.round5(before_result.pct)
+    after_rounded = change.round5(after_result.pct)
+    delta_rounded = int(after_rounded - before_rounded)
+
+    days_apart = (after_row["captured_at"] - before_row["captured_at"]).days
+    site_name = site["name"] if site else "the site"
+    description_placeholders = {
+        "site": site_name,
+        "before": int(before_rounded),
+        "after": int(after_rounded),
+        "delta": f"{delta_rounded:+d}",
+        "days": days_apart,
+    }
+    description_template = ChangeDescription(
+        sentence=CHANGE_DESCRIPTION_TEMPLATE.format(**description_placeholders)
+    )
+    description_result, description_model = llm.generate_text(
+        task="change_description",
+        prompt=CHANGE_DESCRIPTION_PROMPT,
+        placeholders=description_placeholders,
+        schema=ChangeDescription,
+        template=description_template,
+    )
+    description = description_result.sentence
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE comparisons SET
+                        status = 'ready',
+                        before_green_pct = :before_pct,
+                        after_green_pct = :after_pct,
+                        delta_green_pct_rounded = :delta_rounded,
+                        before_mask_public_id = :before_mask_public_id,
+                        after_mask_public_id = :after_mask_public_id,
+                        description = :description,
+                        description_model = :description_model
+                    WHERE id = :id
+                    """
+                ),
+                {
+                    "id": str(comparison_id),
+                    "before_pct": before_result.pct,
+                    "after_pct": after_result.pct,
+                    "delta_rounded": delta_rounded,
+                    "before_mask_public_id": before_mask_public_id,
+                    "after_mask_public_id": after_mask_public_id,
+                    "description": description,
+                    "description_model": description_model,
+                },
+            )
+    except OperationalError as exc:
+        raise RetryableError(str(exc)) from exc
+
+    lineage.delete_for("comparison", comparison_id, ["compare", "mask", "ai_text"])
+    lineage.record(
+        "compare",
+        before_compare_url,
+        sources=[UUID(str(before_row["id"]))],
+        tool="cloudinary",
+        transformation="c_fill,g_auto,w_800,h_600/f_jpg",
+        entity=("comparison", comparison_id),
+        source_public_ids=[before_row["cld_public_id"]],
+        source_versions=[int(before_row["cld_version"])],
+    )
+    lineage.record(
+        "compare",
+        after_compare_url,
+        sources=[UUID(str(after_row["id"]))],
+        tool="cloudinary",
+        transformation="c_fill,g_auto,w_800,h_600/f_jpg",
+        entity=("comparison", comparison_id),
+        source_public_ids=[after_row["cld_public_id"]],
+        source_versions=[int(after_row["cld_version"])],
+    )
+    lineage.record(
+        "mask",
+        urls.mask_url(before_mask_public_id),
+        sources=[UUID(str(before_row["id"]))],
+        tool="pillow",
+        entity=("comparison", comparison_id),
+        params={
+            "algorithm": "green_v1",
+            "exg": settings.green_exg_threshold,
+            "brightness": [20, 240],
+            "roi": "bottom70",
+        },
+    )
+    lineage.record(
+        "mask",
+        urls.mask_url(after_mask_public_id),
+        sources=[UUID(str(after_row["id"]))],
+        tool="pillow",
+        entity=("comparison", comparison_id),
+        params={
+            "algorithm": "green_v1",
+            "exg": settings.green_exg_threshold,
+            "brightness": [20, 240],
+            "roi": "bottom70",
+        },
+    )
+    lineage.record(
+        "ai_text",
+        f"db:comparisons:{comparison_id}",
+        sources=[UUID(str(before_row["id"])), UUID(str(after_row["id"]))],
+        tool="llm",
+        model=description_model,
+        entity=("comparison", comparison_id),
+        params={"task": "change_description"},
+    )
+
+
+def on_build_comparison_failed(payload: dict[str, Any], error: str) -> None:
+    _mark_comparison_failed(UUID(str(payload["comparison_id"])), error)
+
+
+def _mark_comparison_failed(comparison_id: UUID, error: str) -> None:
+    engine = get_engine()
+    if engine is None:
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE comparisons SET status = 'failed' WHERE id = :id"),
+                {"id": str(comparison_id)},
+            )
+    except OperationalError:
+        log.exception("could not mark comparison %s failed", comparison_id)
+
+
 def on_analyze_asset_failed(payload: dict[str, Any], error: str) -> None:
     _mark_failed(UUID(str(payload["asset_id"])), error)
 
@@ -368,6 +605,140 @@ def _mark_failed(asset_id: UUID, error: str) -> None:
             )
     except OperationalError:
         log.exception("could not mark asset %s failed", asset_id)
+
+
+def generate_report(payload: dict[str, Any]) -> None:
+    report_id = UUID(str(payload["report_id"]))
+    comparison_ids = [UUID(str(i)) for i in payload.get("comparison_ids", [])]
+    engine = get_engine()
+    if engine is None:
+        raise RetryableError("database not configured")
+
+    try:
+        with engine.begin() as conn:
+            report = conn.execute(
+                text("SELECT * FROM reports WHERE id = :id"), {"id": str(report_id)}
+            ).mappings().first()
+            if report is None:
+                raise PermanentError(f"report {report_id} not found")
+            conn.execute(
+                text("UPDATE reports SET status = 'processing' WHERE id = :id"),
+                {"id": str(report_id)},
+            )
+    except OperationalError as exc:
+        raise RetryableError(str(exc)) from exc
+
+    project_id = UUID(str(report["project_id"]))
+    date_from = report["date_from"]
+    date_to = report["date_to"]
+
+    try:
+        with engine.connect() as conn:
+            metrics = reports.compute_metrics(conn, project_id, date_from, date_to, comparison_ids)
+
+            report_items: list[dict[str, Any]] = []
+            for activity in metrics["top_activities"]:
+                for asset_id in reports.select_evidence_assets(
+                    conn, project_id, date_from, date_to, activity["tag"], limit=2
+                ):
+                    report_items.append(
+                        {"kind": "asset", "asset_id": asset_id, "comparison_id": None, "section": "activities"}
+                    )
+            for comp in metrics["comparisons"]:
+                report_items.append(
+                    {
+                        "kind": "comparison",
+                        "asset_id": None,
+                        "comparison_id": UUID(comp["id"]),
+                        "section": "before_after",
+                    }
+                )
+    except OperationalError as exc:
+        raise RetryableError(str(exc)) from exc
+
+    placeholders = reports.summary_placeholders(metrics)
+    template = ReportSummary(
+        headline=reports.template_headline(metrics),
+        paragraphs=reports.template_paragraphs(metrics),
+        highlights=reports.template_highlights(metrics),
+    )
+    summary_result, summary_model = llm.generate_text(
+        task="report_summary",
+        prompt=_report_summary_prompt(placeholders),
+        placeholders=placeholders,
+        schema=ReportSummary,
+        template=template,
+    )
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM report_items WHERE report_id = :id"), {"id": str(report_id)})
+            for position, item in enumerate(report_items):
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO report_items (report_id, position, kind, asset_id, comparison_id, section)
+                        VALUES (:report_id, :position, :kind, :asset_id, :comparison_id, :section)
+                        """
+                    ),
+                    {
+                        "report_id": str(report_id),
+                        "position": position,
+                        "kind": item["kind"],
+                        "asset_id": str(item["asset_id"]) if item["asset_id"] else None,
+                        "comparison_id": str(item["comparison_id"]) if item["comparison_id"] else None,
+                        "section": item["section"],
+                    },
+                )
+            conn.execute(
+                text(
+                    """
+                    UPDATE reports SET
+                        status = 'ready',
+                        metrics = CAST(:metrics AS jsonb),
+                        summary = CAST(:summary AS jsonb),
+                        summary_model = :summary_model
+                    WHERE id = :id
+                    """
+                ),
+                {
+                    "id": str(report_id),
+                    "metrics": _json(metrics),
+                    "summary": _json(summary_result.model_dump()),
+                    "summary_model": summary_model,
+                },
+            )
+    except OperationalError as exc:
+        raise RetryableError(str(exc)) from exc
+
+    lineage.delete_for("report", report_id, ["ai_text"])
+    lineage.record(
+        "ai_text",
+        f"db:reports:{report_id}",
+        sources=[],
+        tool="llm",
+        model=summary_model,
+        entity=("report", report_id),
+        params={"task": "report_summary"},
+    )
+
+
+def on_generate_report_failed(payload: dict[str, Any], error: str) -> None:
+    _mark_report_failed(UUID(str(payload["report_id"])), error)
+
+
+def _mark_report_failed(report_id: UUID, error: str) -> None:
+    engine = get_engine()
+    if engine is None:
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE reports SET status = 'failed' WHERE id = :id"),
+                {"id": str(report_id)},
+            )
+    except OperationalError:
+        log.exception("could not mark report %s failed", report_id)
 
 
 def _vec_literal(vec: np.ndarray) -> str:

@@ -87,6 +87,15 @@ def url(
     return result
 
 
+def raw_url(public_id: str, transformation: list[dict]) -> str:
+    if settings.cloudinary_url:
+        _configure()
+    else:
+        cloudinary.config(cloud_name="demo", secure=True)
+    result, _ = cloudinary.utils.cloudinary_url(public_id, secure=True, transformation=transformation)
+    return result
+
+
 def upload_derived(data: bytes, folder: str, **kw: Any) -> dict:
     _configure()
     try:
