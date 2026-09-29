@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeftRight, ArrowRight, Camera, FileText, MapPin } from "lucide-react";
+import { DashboardInsights } from "@/components/dashboard-insights";
 import { NewProjectDialog } from "@/components/new-project-dialog";
 import { PageHeader } from "@/components/page-header";
 import { loadProjectExtras, ProjectCard, type ProjectExtras } from "@/components/project-card";
@@ -82,6 +83,8 @@ export default function DashboardPage() {
         <StatCard label="Before / after comparisons" value={sumExtras((x) => x.comparisons)} sub="with estimated green-cover change" icon={ArrowLeftRight} gradient="mint" />
         <StatCard label="Impact reports" value={sumExtras((x) => x.reports)} sub="with campaign kits and lineage" icon={FileText} gradient="lilac" />
       </section>
+
+      {featured ? <DashboardInsights key={featured.id} project={featured} /> : null}
 
       <section className="space-y-4">
         <h2 className="type-title">Your projects</h2>

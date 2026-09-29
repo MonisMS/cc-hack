@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftRight, ArrowUpRight, CalendarDays, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { ArrowLeftRight, ArrowUpRight, CalendarDays, Trophy } from "lucide-react";
+import { GreenDelta } from "@/components/green-delta";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -10,28 +11,6 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Comparison } from "@/lib/types";
 import { useAcrossProjects } from "@/lib/workspace";
-
-function Delta({ value }: { value: number | null }) {
-  if (value == null) return <span className="text-xs text-muted-foreground">no estimate</span>;
-  const up = value > 0;
-  const flat = value === 0;
-  const Icon = up ? TrendingUp : TrendingDown;
-  return (
-    <span
-      className={
-        flat
-          ? "inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground"
-          : up
-            ? "inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-            : "inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700"
-      }
-    >
-      {flat ? null : <Icon className="size-3.5" />}
-      {up ? "+" : ""}
-      {value} pts green
-    </span>
-  );
-}
 
 export default function ComparisonsPage() {
   const { items, error } = useAcrossProjects<Comparison>((id) => `/api/projects/${id}/comparisons`);
@@ -121,7 +100,7 @@ export default function ComparisonsPage() {
                         : ""}
                     </p>
                   </div>
-                  {c.status === "ready" ? <Delta value={c.delta_green_pct_rounded} /> : <StatusBadge status={c.status} />}
+                  {c.status === "ready" ? <GreenDelta value={c.delta_green_pct_rounded} /> : <StatusBadge status={c.status} />}
                 </div>
               </Card>
             </Link>
