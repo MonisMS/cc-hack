@@ -29,3 +29,6 @@ web/.next/
 Thumbs.db
 .vscode/
 .idea/
+
+# Live-run logs
+backend/logs/

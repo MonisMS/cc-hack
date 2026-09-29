@@ -5,6 +5,10 @@ import type { ApiErrorEnvelope } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+// The backend may sit behind a free ngrok tunnel, which serves a warning page instead of
+// the API unless this header is present. Harmless everywhere else.
+export const TUNNEL_HEADERS = { "ngrok-skip-browser-warning": "1" };
+
 export class ApiErr extends Error {
   code: string;
   status: number;
@@ -23,6 +27,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...TUNNEL_HEADERS,
       ...init?.headers,
     },
   });

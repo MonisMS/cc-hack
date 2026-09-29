@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
 
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # The web app is deployed on Vercel (production + preview URLs).
+    cors_origin_regex: str | None = r"https://[a-z0-9-]+\.vercel\.app"
     models_dir: Path = BACKEND_DIR / "models"
 
     gemini_model: str = "gemini/gemini-2.0-flash-lite"

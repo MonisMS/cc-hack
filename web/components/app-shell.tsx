@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Award, FolderKanban, Images, LayoutDashboard, Leaf, Search, Upload, type LucideIcon } from "lucide-react";
+import { TUNNEL_HEADERS } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -13,7 +14,7 @@ function HealthDot() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE_URL}/health`)
+    fetch(`${API_BASE_URL}/health`, { headers: TUNNEL_HEADERS })
       .then((res) => {
         if (!cancelled) setOk(res.ok);
       })
