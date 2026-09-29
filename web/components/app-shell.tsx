@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   ArrowLeftRight,
   Award,
+  CloudOff,
   FileText,
   FolderKanban,
   Images,
@@ -17,39 +18,61 @@ import {
   Upload,
   type LucideIcon,
 } from "lucide-react";
-import { TUNNEL_HEADERS } from "@/lib/api";
+import { enterSnapshotMode, isSnapshotMode, onSnapshotMode, TUNNEL_HEADERS } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+function useSnapshotMode() {
+  return useSyncExternalStore(onSnapshotMode, isSnapshotMode, () => false);
+}
+
 function HealthDot() {
   const [ok, setOk] = useState<boolean | null>(null);
+  const snapshot = useSnapshotMode();
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE_URL}/health`, { headers: TUNNEL_HEADERS })
+    fetch(`${API_BASE_URL}/health`, { headers: TUNNEL_HEADERS, signal: AbortSignal.timeout(10000) })
       .then((res) => {
-        if (!cancelled) setOk(res.ok);
+        if (cancelled) return;
+        setOk(res.ok);
+        if (!res.ok) enterSnapshotMode();
       })
       .catch(() => {
-        if (!cancelled) setOk(false);
+        if (cancelled) return;
+        setOk(false);
+        enterSnapshotMode();
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const state = snapshot ? "snapshot" : ok === null ? "checking" : ok ? "online" : "snapshot";
   return (
     <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2.5 text-xs text-muted-foreground">
       <span
         className={cn(
           "size-2 rounded-full",
-          ok === null && "bg-muted-foreground/40",
-          ok === true && "bg-green-500",
-          ok === false && "bg-destructive",
+          state === "checking" && "bg-muted-foreground/40",
+          state === "online" && "bg-green-500",
+          state === "snapshot" && "bg-amber-500",
         )}
       />
-      {ok === null ? "checking API..." : ok ? "API online" : "API offline"}
+      {state === "checking" ? "Checking live API..." : state === "online" ? "Live API online" : "Saved snapshot mode"}
+    </div>
+  );
+}
+
+function SnapshotBanner() {
+  const snapshot = useSnapshotMode();
+  if (!snapshot) return null;
+  return (
+    <div className="no-print flex items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-center text-[13px] font-medium text-amber-900">
+      <CloudOff className="size-4 shrink-0" />
+      The live backend is offline right now, so you&apos;re viewing a saved snapshot of the real data. Browsing works;
+      uploads and new reports need the live backend.
     </div>
   );
 }
@@ -109,7 +132,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <HealthDot />
         </div>
       </aside>
-      <main className="flex-1 min-w-0">{children}</main>
+      <main className="flex-1 min-w-0">
+        <SnapshotBanner />
+        {children}
+      </main>
     </div>
   );
 }

@@ -17,20 +17,24 @@ log = logging.getLogger("fieldproof.llm")
 _PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 
 
-def _model_chain() -> list[str]:
-    chain: list[str] = []
+def _model_chain() -> list[tuple[str, str]]:
+    """(model, api_key) pairs in fallback order. Keys are passed explicitly because
+    they live in our settings, not in os.environ where LiteLLM would look."""
+    chain: list[tuple[str, str]] = []
+    if settings.openrouter_api_key:
+        chain.extend((m, settings.openrouter_api_key) for m in settings.openrouter_models)
     if settings.gemini_api_key:
-        chain.append(settings.gemini_model)
+        chain.append((settings.gemini_model, settings.gemini_api_key))
     if settings.groq_api_key:
-        chain.append("groq/openai/gpt-oss-20b")
+        chain.append(("groq/openai/gpt-oss-20b", settings.groq_api_key))
     if settings.cerebras_api_key:
-        chain.append("cerebras/gpt-oss-120b")
+        chain.append(("cerebras/gpt-oss-120b", settings.cerebras_api_key))
     return chain
 
 
-def _cache_key(task: str, chain: list[str], prompt: str, placeholders: dict) -> str:
+def _cache_key(task: str, chain: list[tuple[str, str]], prompt: str, placeholders: dict) -> str:
     payload = json.dumps(
-        {"task": task, "chain": chain, "prompt": prompt, "placeholders": placeholders},
+        {"task": task, "chain": [m for m, _ in chain], "prompt": prompt, "placeholders": placeholders},
         sort_keys=True,
         default=str,
     )
@@ -100,6 +104,15 @@ def _fill(data: dict, placeholders: dict[str, str | int | float]) -> dict:
     return filled
 
 
+def _strip_fences(text: str) -> str:
+    """Some models wrap JSON in ```json fences even when asked for structured output."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        text = text.rsplit("```", 1)[0]
+    return text.strip()
+
+
 def generate_text[T: BaseModel](
     task: str,
     prompt: str,
@@ -122,27 +135,27 @@ def generate_text[T: BaseModel](
 
     import litellm
 
-    for attempt in range(2):
+    for model, api_key in chain:
         try:
             response = litellm.completion(
-                model=chain[0],
-                fallbacks=chain[1:],
+                model=model,
+                api_key=api_key,
                 response_format=schema,
-                num_retries=2,
-                timeout=20,
+                num_retries=1,
+                timeout=30,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = json.loads(response.choices[0].message.content)
+            raw = json.loads(_strip_fences(response.choices[0].message.content or ""))
             if not _guard(raw, placeholders):
-                log.warning("llm guard rejected response for task %s (attempt %d)", task, attempt)
+                log.warning("llm guard rejected %s output for task %s", model, task)
                 continue
             filled = _fill(raw, placeholders)
             result = schema.model_validate(filled)
-            model_used = getattr(response, "model", chain[0]) or chain[0]
+            model_used = model.removeprefix("openrouter/")
             _cache_set(key, model_used, {"data": filled, "model": model_used})
             return result, model_used
         except Exception:
-            log.warning("llm generate_text failed for task %s (attempt %d)", task, attempt, exc_info=True)
+            log.warning("llm %s failed for task %s", model, task, exc_info=True)
             continue
 
     return template, "template"

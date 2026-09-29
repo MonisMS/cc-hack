@@ -5,7 +5,8 @@
 Built for Code Cubicle 6.0, problem statement 2 (Cloudinary).
 
 - 🎥 Demo video: `<ADD LINK>`
-- 🖥️ Runs locally (see [Run it locally](#run-it-locally)). We did not deploy a public instance.
+- 🌐 Live app: `<ADD VERCEL URL>` (frontend on Vercel; the backend runs on our machine behind a fixed ngrok URL).
+- 🛟 If the live backend is offline when you visit, the app switches to a **saved snapshot** of the real data and says so in an amber banner: browsing, comparisons, reports and example searches all still work; uploads and creating new items need the live backend. The snapshot is `web/public/snapshot.json`, recorded by `web/scripts/capture_snapshot.py`.
 
 ---
 
@@ -17,7 +18,7 @@ NGOs and community groups collect photos while planting trees, cleaning public s
 
 FieldProof organizes field photos automatically and turns them into evidence someone can trust:
 
-1. **Upload** photos from a phone or laptop straight to Cloudinary (consent checkbox, optional device location).
+1. **Upload** photos and videos from a phone or laptop straight to Cloudinary (consent checkbox, optional device location). Videos are analysed from three keyframes (at 10%, 50% and 90% of the clip) and play back in the app.
 2. **Automatic analysis**: a background worker reads EXIF date and GPS, embeds each image with CLIP, tags activities (sapling, flood, mangrove, waste, solar…), adds Cloudinary object-detection tags and assigns the photo to the nearest project site.
 3. **Search** in plain English ("saplings being planted", "flooded road"), filtered by project, site and tag.
 4. **Compare** before and after photos of a site. FieldProof suggests pairs (same site, at least 7 days apart, visually similar), shows a slider and estimates the change in green cover, with the mask shown.
@@ -36,7 +37,7 @@ FieldProof organizes field photos automatically and turns them into evidence som
 | G5 AI-powered search and discovery | Semantic search (CLIP text → pgvector) with tag boost and filters | ✅ |
 | G6 Traceability to source assets and transformations | Lineage records and a lineage panel on every asset, comparison and kit item | ✅ |
 
-**Roadmap (designed, not built for the hackathon):** map view, timeline, video upload with keyframes in the UI, quote cards, usage-meter page, CI, structured-metadata write-back to Cloudinary, auth, rounding GPS in public views.
+**Roadmap (designed, not built for the hackathon):** map view, video transcription, quote cards, usage-meter page, CI, structured-metadata write-back to Cloudinary, auth, rounding GPS in public views.
 
 ## Architecture
 
@@ -57,7 +58,7 @@ flowchart LR
     subgraph Cloud["External services (free tiers)"]
         CLD[("Cloudinary<br/>storage · transformations<br/>AI add-ons · Admin API")]
         DB[("Neon Postgres<br/>+ pgvector")]
-        LLM["LLM providers via LiteLLM<br/>Gemini → Groq → Cerebras<br/>(optional)"]
+        LLM["LLM providers via LiteLLM<br/>OpenRouter → Gemini → Groq → Cerebras<br/>(optional)"]
     end
 
     W -- "unsigned upload" --> CLD
@@ -82,7 +83,7 @@ flowchart LR
 |---|---|
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind, shadcn/ui (Base UI), next-cloudinary, react-compare-slider |
 | Backend | Python 3.12, FastAPI, SQLAlchemy, uv |
-| AI | CLIP via fastembed (local ONNX) for tags and search; Cloudinary AI Content Analysis (`coco_v2`); LiteLLM (Gemini / Groq / Cerebras) for summaries, with a template fallback |
+| AI | CLIP via fastembed (local ONNX) for tags and search; Cloudinary AI Content Analysis (`coco_v2`); LiteLLM with Gemini 3.5 Flash-Lite (OpenRouter, Groq and Cerebras also supported) for summaries, with a template fallback |
 | Media | Cloudinary: upload widget, `g_auto` crops, `e_blur_faces`, collages, Admin API |
 | Data | Neon Postgres + pgvector |
 
@@ -95,7 +96,7 @@ Prerequisites: Node.js ≥ 20.9, pnpm, [uv](https://docs.astral.sh/uv/), a free 
 ```bash
 cd backend
 uv sync
-cp .env.example .env                        # fill DATABASE_URL and CLOUDINARY_URL (LLM keys optional)
+cp .env.example .env                        # fill DATABASE_URL and CLOUDINARY_URL; GEMINI_API_KEY (or OPENROUTER_API_KEY) optional
 uv run python scripts/migrate.py            # create tables + pgvector
 uv run python scripts/setup_cloudinary.py   # create upload presets
 uv run uvicorn app.main:app --port 8000     # API → http://localhost:8000/health
@@ -137,7 +138,7 @@ pnpm dev                      # → http://localhost:3000
 ## Honesty notes
 
 - **Green cover is an estimate** from a simple colour-threshold algorithm, not a scientific survey.
-- **The demo data is staged.** The sample photos are from Wikimedia Commons and have no EXIF date or GPS. The seed script places them at 4 sites in India, and `spread_demo_dates.py` assigns them capture dates between January and September 2026 so that before/after pairing and date-ranged reports can be demonstrated. These dates are marked `captured_at_source = manual` in the database.
+- **The demo data is staged.** The sample photos are from Wikimedia Commons and have no EXIF date or GPS. The seed script places them at 4 sites in India, and `spread_demo_dates.py` assigns them capture dates between January and September 2026 so that before/after pairing and date-ranged reports can be demonstrated. These dates are marked `captured_at_source = manual` in the database. The demo video (`sundarbans_mangrove_walkthrough.mp4`) is a short clip made from two of these Wikimedia photos.
 
 ## Credits
 

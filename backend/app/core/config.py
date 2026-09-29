@@ -20,13 +20,19 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     cerebras_api_key: str | None = None
     groq_api_key: str | None = None
+    openrouter_api_key: str | None = None
 
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     # The web app is deployed on Vercel (production + preview URLs).
     cors_origin_regex: str | None = r"https://[a-z0-9-]+\.vercel\.app"
     models_dir: Path = BACKEND_DIR / "models"
 
-    gemini_model: str = "gemini/gemini-2.0-flash-lite"
+    gemini_model: str = "gemini/gemini-3.5-flash-lite"
+    # Free OpenRouter models that support structured JSON output (checked 29 Sep 2026).
+    openrouter_models: list[str] = [
+        "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "openrouter/google/gemma-4-31b-it:free",
+    ]
     cloudinary_image_preset: str = "fp_image"
     enable_g_auto: bool = True
     enable_blur_faces: bool = True

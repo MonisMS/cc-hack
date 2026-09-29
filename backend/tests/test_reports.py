@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from app.core.config import settings
 from app.core.db import get_engine
 from app.fieldproof import pipelines
 from app.main import app
@@ -90,7 +91,10 @@ def _cleanup(project_id: str, asset_ids: list[str], comparison_ids: list[str], r
         conn.execute(text("DELETE FROM projects WHERE id = :id"), {"id": project_id})
 
 
-def test_report_reaches_ready_with_consistent_metrics():
+def test_report_reaches_ready_with_consistent_metrics(monkeypatch):
+    # This test checks the template path, so run it without any LLM configured.
+    for key in ("openrouter_api_key", "gemini_api_key", "groq_api_key", "cerebras_api_key"):
+        monkeypatch.setattr(settings, key, None)
     project_id, site_id = _make_project_and_site()
     now = datetime.now(UTC)
     engine = get_engine()

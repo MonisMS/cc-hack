@@ -142,17 +142,21 @@ def select_evidence_assets(
 
 
 def summary_placeholders(metrics: dict[str, Any]) -> dict[str, str | int | float]:
+    # Values carry their own nouns/units so the model can't drop or misstate them.
+    def count(n: int, singular: str, plural: str) -> str:
+        return f"{n} {singular if n == 1 else plural}"
+
     placeholders: dict[str, str | int | float] = {
-        "assets_total": metrics["assets_total"],
-        "sites": metrics["sites_with_evidence"],
+        "assets_total": count(metrics["assets_total"], "photo or video", "photos and videos"),
+        "sites": count(metrics["sites_with_evidence"], "site", "sites"),
     }
     if metrics["top_activities"]:
-        placeholders["top1_tag"] = metrics["top_activities"][0]["tag"]
-        placeholders["top1_count"] = metrics["top_activities"][0]["count"]
+        placeholders["top1_tag"] = metrics["top_activities"][0]["tag"].replace("_", " ")
+        placeholders["top1_count"] = count(metrics["top_activities"][0]["count"], "photo", "photos")
     for i, comp in enumerate(metrics["comparisons"], start=1):
         placeholders[f"c{i}_site"] = comp["site_name"]
         delta = comp["delta_green_pct_rounded"]
-        placeholders[f"c{i}_delta"] = f"{delta:+d}" if delta is not None else "+0"
+        placeholders[f"c{i}_delta"] = f"{delta:+d} percentage points" if delta is not None else "no measurable change"
     return placeholders
 
 

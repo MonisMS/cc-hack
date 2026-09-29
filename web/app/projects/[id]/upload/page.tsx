@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Check, ImageUp, LocateFixed, ShieldCheck } from "lucide-react";
+import { Check, Film, ImageUp, LocateFixed, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { AssetDetail } from "@/lib/types";
 
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_IMAGE_PRESET ?? "fp_image";
+const VIDEO_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_VIDEO_PRESET ?? "fp_video";
 
 // Themes Cloudinary's upload popup to match the app (palette/fonts keys per the Upload Widget docs).
 const WIDGET_STYLES = {
@@ -109,7 +110,7 @@ export default function UploadPage() {
     if (!loggedFirstResult.current) {
       loggedFirstResult.current = true;
       console.log("Cloudinary upload result.info:", asInfo);
-      if (!asInfo.image_metadata) {
+      if (asInfo.resource_type === "image" && !asInfo.image_metadata) {
         toast.warning(
           "This upload has no EXIF image_metadata — the worker will fall back to one Admin API call for it.",
         );
@@ -131,6 +132,7 @@ export default function UploadPage() {
             width: asInfo.width,
             height: asInfo.height,
             bytes: asInfo.bytes,
+            duration_s: (asInfo as { duration?: number }).duration ?? null,
             secure_url: asInfo.secure_url,
             device_lat: deviceLat,
             device_lng: deviceLng,
@@ -191,32 +193,57 @@ export default function UploadPage() {
             </Button>
           </div>
 
-          <CldUploadWidget
-            uploadPreset={UPLOAD_PRESET}
-            onSuccess={handleUploadSuccess}
-            options={{
-              sources: ["local", "camera"],
-              multiple: true,
-              maxFiles: 20,
-              clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "heic"],
-              styles: WIDGET_STYLES,
-            }}
-          >
-            {({ open }) => (
-              <button
-                type="button"
-                disabled={!consent}
-                onClick={() => open()}
-                className="group flex w-full flex-col items-center gap-3 rounded-3xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-violet-50 via-white to-teal-50 px-6 py-12 text-center transition-colors hover:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_10px_24px_-10px_var(--primary)] transition-transform group-enabled:group-hover:-translate-y-0.5">
-                  <ImageUp className="size-6" />
-                </span>
-                <span className="type-title">{consent ? "Choose photos or take one" : "Confirm permission to start"}</span>
-                <span className="text-sm text-muted-foreground">JPG, PNG, WEBP or HEIC · up to 20 at a time · camera works on phones</span>
-              </button>
+          <div
+            className={cn(
+              "flex flex-col items-center gap-3 rounded-3xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-violet-50 via-white to-teal-50 px-6 py-12 text-center",
+              !consent && "opacity-60",
             )}
-          </CldUploadWidget>
+          >
+            <span className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_10px_24px_-10px_var(--primary)]">
+              <ImageUp className="size-6" />
+            </span>
+            <span className="type-title">{consent ? "Add field photos or videos" : "Confirm permission to start"}</span>
+            <span className="text-sm text-muted-foreground">
+              Photos: JPG, PNG, WEBP or HEIC, up to 20 at a time · Videos: MP4 or MOV, up to 100 MB · camera works on phones
+            </span>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              <CldUploadWidget
+                uploadPreset={UPLOAD_PRESET}
+                onSuccess={handleUploadSuccess}
+                options={{
+                  sources: ["local", "camera"],
+                  multiple: true,
+                  maxFiles: 20,
+                  clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "heic"],
+                  styles: WIDGET_STYLES,
+                }}
+              >
+                {({ open }) => (
+                  <Button type="button" size="lg" disabled={!consent} onClick={() => open()}>
+                    <ImageUp /> Upload photos
+                  </Button>
+                )}
+              </CldUploadWidget>
+              <CldUploadWidget
+                uploadPreset={VIDEO_PRESET}
+                onSuccess={handleUploadSuccess}
+                options={{
+                  sources: ["local", "camera"],
+                  resourceType: "video",
+                  multiple: false,
+                  maxFileSize: 100_000_000,
+                  clientAllowedFormats: ["mp4", "mov"],
+                  styles: WIDGET_STYLES,
+                }}
+              >
+                {({ open }) => (
+                  <Button type="button" size="lg" variant="outline" disabled={!consent} onClick={() => open()}>
+                    <Film /> Upload a video
+                  </Button>
+                )}
+              </CldUploadWidget>
+            </div>
+          </div>
         </div>
 
         <Card className="h-fit">
@@ -227,6 +254,7 @@ export default function UploadPage() {
             <ol className="space-y-3">
               {[
                 "Uploads go straight to Cloudinary",
+                "Videos: three keyframes are analysed",
                 "Date and GPS are read from the photo",
                 "It's placed on the nearest site",
                 "CLIP and object detection tag it",

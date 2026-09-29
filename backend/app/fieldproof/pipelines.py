@@ -40,8 +40,10 @@ CHANGE_DESCRIPTION_TEMPLATE = (
 CHANGE_DESCRIPTION_PROMPT = (
     "Write ONE short sentence for a conservation report describing a change in green vegetation "
     "cover at a site. You MUST use these exact placeholder tokens in your sentence instead of any "
-    "literal numbers: {site}, {before}, {after}, {delta}, {days}. Never write a digit yourself; the "
-    "placeholders are substituted afterward with the real values. "
+    "literal numbers: {site} (site name), {before} and {after} (estimated green cover, in percent), "
+    "{delta} (signed change in percentage points), {days} (days between the two photos). Never write a "
+    "digit yourself; the placeholders are substituted afterward with the real values. Say the cover is "
+    "estimated, report a decrease as a decrease, and do not invent causes. "
     'Respond with JSON only: {"sentence": "..."}.'
 )
 
@@ -56,15 +58,41 @@ class ReportSummary(BaseModel):
     highlights: list[str] = Field(min_length=3, max_length=5)
 
 
+def _placeholder_meaning(name: str) -> str:
+    if name == "assets_total":
+        return "how many field photos and videos were analysed (already includes the noun)"
+    if name == "sites":
+        return "how many sites have evidence (already includes the noun)"
+    if name == "top1_tag":
+        return "the most frequent AI-detected tag in the photos (an observation, not necessarily good news)"
+    if name == "top1_count":
+        return "how many photos carry that tag (already includes the noun)"
+    if name.endswith("_site"):
+        return "name of a site with a before/after comparison"
+    if name.endswith("_delta"):
+        return (
+            f"change in ESTIMATED green vegetation cover at {{{name.removesuffix('_delta')}_site}} "
+            "(already signed and includes its unit)"
+        )
+    return "a measured value"
+
+
 def _report_summary_prompt(placeholders: dict[str, Any]) -> str:
-    names = ", ".join("{" + k + "}" for k in placeholders)
+    legend = "\n".join(f"- {{{k}}}: {_placeholder_meaning(k)}" for k in placeholders)
     return (
-        "Write a short summary for a community conservation report, given field evidence metrics. "
-        "You MUST use only these exact placeholder tokens for any numbers or site names in your text "
-        f"— never write a digit or a proper name yourself: {names}. "
+        "Write a short, factual summary for an NGO field-evidence report.\n"
+        "Placeholder tokens and what they mean:\n"
+        f"{legend}\n"
+        "Rules:\n"
+        "- Use ONLY these tokens for every number and site name; never write a digit or a proper name yourself.\n"
+        "- Tokens marked as including their noun or unit must not get another one after them.\n"
+        "- Describe green-cover changes as \"estimated green cover\" in \"percentage points\". "
+        "Report decreases as decreases; do not spin them as positive.\n"
+        "- Do not invent causes, outcomes, people or programmes that the metrics do not state.\n"
+        "- Plain, neutral language; no marketing words.\n"
         'Respond with JSON only: {"headline": "...", "paragraphs": ["...", "..."], '
-        '"highlights": ["...", "...", "..."]}. paragraphs must have 2 to 3 entries; '
-        "highlights must have 3 to 5 entries."
+        '"highlights": ["...", "...", "..."]}. The headline is under 10 words. paragraphs must have 2 to 3 '
+        "entries; highlights must have 3 to 5 entries."
     )
 
 

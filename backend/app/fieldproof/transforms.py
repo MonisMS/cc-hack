@@ -72,6 +72,9 @@ def chain(preset: NamedTransform, **kw) -> list[dict]:
     if preset is NamedTransform.VIDEO_FRAME:
         t = kw.get("t", 0)
         steps = [{"start_offset": t}, *steps]
+    elif kw.get("t") is not None:
+        # Display presets on a video: take one frame as the still image.
+        steps = [{"start_offset": kw["t"]}, *steps]
     if preset is NamedTransform.QUOTE_CARD and kw.get("text"):
         overlay_text = str(kw["text"])[:80]
         overlay_text = "".join(ch for ch in overlay_text if ord(ch) < 128 and ch.isprintable())

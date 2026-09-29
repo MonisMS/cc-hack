@@ -24,6 +24,7 @@ def test_generate_text_returns_template_with_no_keys(monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", None)
     monkeypatch.setattr(settings, "groq_api_key", None)
     monkeypatch.setattr(settings, "cerebras_api_key", None)
+    monkeypatch.setattr(settings, "openrouter_api_key", None)
 
     template = _Sentence(sentence="At the site, cover changed by +5 points.")
     result, model_used = llm.generate_text(

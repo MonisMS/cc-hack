@@ -174,11 +174,18 @@ export default function AssetDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <img
-          src={asset.compare_url}
-          alt=""
-          className="w-full rounded-lg border object-contain bg-muted"
-        />
+        {asset.resource_type === "video" ? (
+          <video
+            src={asset.secure_url}
+            poster={asset.compare_url}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full rounded-2xl bg-black"
+          />
+        ) : (
+          <img src={asset.compare_url} alt="" className="w-full rounded-2xl bg-muted object-contain" />
+        )}
 
         <div className="space-y-4">
           <Card>

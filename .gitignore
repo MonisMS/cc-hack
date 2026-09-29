@@ -32,3 +32,5 @@ Thumbs.db
 
 # Live-run logs
 backend/logs/
+
+backend/samples/video/

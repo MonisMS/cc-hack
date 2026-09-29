@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin } from "lucide-react";
+import { MapPin, Play } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import type { AssetCard as AssetCardType } from "@/lib/types";
 
@@ -21,6 +21,11 @@ export function AssetCard({ asset, scoreBadge }: { asset: AssetCardType; scoreBa
       {scoreBadge ? (
         <span className="absolute right-2.5 top-2.5 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-sm">
           {scoreBadge} match
+        </span>
+      ) : null}
+      {asset.resource_type === "video" ? (
+        <span className="absolute left-1/2 top-[40%] grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-transform group-hover:scale-110">
+          <Play className="ml-0.5 size-5 fill-current" />
         </span>
       ) : null}
       {asset.status !== "ready" ? (

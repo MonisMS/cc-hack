@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import { ArrowUpRight } from "lucide-react";
 import { AssetCard } from "@/components/asset-card";
-import { ColumnChart, HBarList, type Datum } from "@/components/bar-charts";
+import { AreaChart, TagMosaic, type Datum, type TagTile } from "@/components/bar-charts";
 import { GreenDelta } from "@/components/green-delta";
 import { MetaLine } from "@/components/photo-mosaic";
 import { Button } from "@/components/ui/button";
@@ -72,16 +72,34 @@ function photosPerMonth(assets: AssetCardType[]): Datum[] {
   return out;
 }
 
-function topTags(assets: AssetCardType[], n = 8): Datum[] {
-  const counts = assets.reduce<Record<string, number>>((acc, a) => {
-    // A tag can come from both CLIP and object detection; count each photo once per tag.
-    for (const tag of new Set(a.tags.map((t) => t.tag))) acc[tag] = (acc[tag] ?? 0) + 1;
-    return acc;
-  }, {});
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
+function latestCapture(assets: AssetCardType[]): string | null {
+  const dates = assets.map((a) => a.captured_at).filter(Boolean) as string[];
+  if (!dates.length) return null;
+  const d = new Date(dates.sort().at(-1)!);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function topTags(assets: AssetCardType[], n = 8): TagTile[] {
+  // Per tag: how many photos carry it, and the photo where the AI was most confident.
+  const byTag = new Map<string, { count: number; best?: { score: number; url: string } }>();
+  for (const a of assets) {
+    for (const tag of new Set(a.tags.map((t) => t.tag))) {
+      const entry = byTag.get(tag) ?? { count: 0 };
+      entry.count += 1;
+      const score = Math.max(...a.tags.filter((t) => t.tag === tag).map((t) => t.score ?? 0));
+      if (a.resource_type === "image" && (!entry.best || score > entry.best.score)) entry.best = { score, url: a.thumb_url };
+      byTag.set(tag, entry);
+    }
+  }
+  return [...byTag.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
     .slice(0, n)
-    .map(([tag, value]) => ({ label: tag.replace(/_/g, " "), value }));
+    .map(([tag, e]) => ({
+      tag: tag.replace(/_/g, " "),
+      value: e.count,
+      photo: e.best?.url,
+      href: `/library?tag=${encodeURIComponent(tag)}`,
+    }));
 }
 
 function SectionCard({
@@ -224,13 +242,26 @@ export function DashboardInsights({ project }: { project: Project }) {
       <div className="grid gap-4 lg:grid-cols-2">
         {tags.length ? (
           <SectionCard eyebrow="AI tagging" title="What the AI sees in your photos">
-            <HBarList data={tags} unit="photos" labelHeader="Tag" />
+            <TagMosaic tiles={tags} total={data.assets.length} />
+            <p className="mt-3 text-xs text-muted-foreground">Each tile shows the photo the AI was most confident about. Click to see them all.</p>
           </SectionCard>
         ) : null}
         {months.length ? (
           <SectionCard eyebrow="Collection" title="Evidence over time">
-            <ColumnChart data={months} unit="photos" labelHeader="Month" />
-            <p className="mt-3 text-xs text-muted-foreground">Photos per month, by capture date.</p>
+            <AreaChart data={months} unit="photos" labelHeader="Month" />
+            <p className="mt-1 text-xs text-muted-foreground">Photos per month, by capture date.</p>
+            <dl className="mt-5 grid grid-cols-3 gap-3">
+              {[
+                { k: "Busiest month", v: months.reduce((m, d) => (d.value > m.value ? d : m)).label },
+                { k: "Monthly average", v: `${(months.reduce((n, d) => n + d.value, 0) / months.length).toFixed(1)} photos` },
+                { k: "Latest capture", v: latestCapture(data.assets) ?? "—" },
+              ].map(({ k, v }) => (
+                <div key={k} className="rounded-xl bg-muted/60 p-3">
+                  <dt className="type-eyebrow text-muted-foreground">{k}</dt>
+                  <dd className="mt-1 text-sm font-bold">{v}</dd>
+                </div>
+              ))}
+            </dl>
           </SectionCard>
         ) : null}
       </div>
