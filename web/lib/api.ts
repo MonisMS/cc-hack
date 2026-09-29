@@ -93,6 +93,16 @@ function searchSnapshot(data: SnapshotData, init?: RequestInit) {
   return { items };
 }
 
+/** Quick liveness probe used to tell "slow" apart from "down". */
+async function backendReachable(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/health`, { headers: TUNNEL_HEADERS, signal: AbortSignal.timeout(5000) });
+    return (res.headers.get("content-type") ?? "").includes("application/json");
+  } catch {
+    return false;
+  }
+}
+
 async function fromSnapshot<T>(path: string, init?: RequestInit): Promise<T> {
   const data = await loadSnapshot();
   const key = snapshotKey(path, init);
@@ -108,7 +118,20 @@ async function fromSnapshot<T>(path: string, init?: RequestInit): Promise<T> {
   );
 }
 
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+// Identical GETs that are already in flight share one request (pages often ask for the same list).
+const inflight = new Map<string, Promise<unknown>>();
+
+export function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method !== "GET") return request<T>(path, init);
+  const pending = inflight.get(path);
+  if (pending) return pending as Promise<T>;
+  const p = request<T>(path, init).finally(() => inflight.delete(path));
+  inflight.set(path, p);
+  return p;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (snapshotMode) return fromSnapshot<T>(path, init);
 
   let res: Response;
@@ -116,15 +139,23 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       // Fail over quickly instead of leaving a judge staring at spinners.
-      signal: init?.signal ?? AbortSignal.timeout(path === "/api/search" ? 20000 : 10000),
+      signal: init?.signal ?? AbortSignal.timeout(20000),
       headers: {
         "Content-Type": "application/json",
         ...TUNNEL_HEADERS,
         ...init?.headers,
       },
     });
-  } catch {
-    // Network error, CORS-less tunnel error page, or timeout: the backend is unreachable.
+  } catch (err) {
+    const timedOut = err instanceof DOMException && err.name === "TimeoutError";
+    if (timedOut && (await backendReachable())) {
+      // The backend is up but this call is slow: fill just this request from the snapshot if we
+      // can, and stay in live mode for everything else.
+      return fromSnapshot<T>(path, init).catch(() => {
+        throw new ApiErr("TIMEOUT", "The server is taking too long to respond. Please try again.", 0);
+      });
+    }
+    // Network error, CORS-less tunnel error page, or a dead backend: switch to the snapshot.
     enterSnapshotMode();
     return fromSnapshot<T>(path, init);
   }

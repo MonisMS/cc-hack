@@ -39,8 +39,10 @@ function HealthDot() {
         setOk(res.ok);
         if (!res.ok) enterSnapshotMode();
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
+        // A slow reply isn't an outage; only a failed connection switches to the snapshot.
+        if (err instanceof DOMException && err.name === "TimeoutError") return setOk(true);
         setOk(false);
         enterSnapshotMode();
       });
