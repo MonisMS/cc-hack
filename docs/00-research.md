@@ -1,3 +1,4 @@
+---CODE CUBICAL ONLINE ROUND PROTOTYPE DOCUMENTATION---
 # 00 — Research: FieldProof (PS2, Cloudinary)
 
 _Research date: 23 Sep 2026. Every claim that matters is tagged:_
@@ -18,7 +19,7 @@ _Decisions the team has already made are marked 🔒 **LOCKED**. New stack choic
 
 - ✅ **TEAM DECISION (24 Sep):** plan for **30 Sep 2026** as the hard deadline for a complete, deployed submission. Use 1–11 Oct for offline-round polish.
 
----
+--- 
 
 ## 1. Cloudinary (required by the problem statement)
 
