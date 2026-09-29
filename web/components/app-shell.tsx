@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-56 shrink-0 border-r bg-muted/30 flex flex-col">
+      <aside className="no-print w-56 shrink-0 border-r bg-muted/30 flex flex-col">
         <div className="px-3 py-4">
           <Link href="/" className="text-lg font-semibold px-3">
             FieldProof

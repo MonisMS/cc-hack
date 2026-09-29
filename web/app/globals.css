@@ -128,3 +128,21 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  html,
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .print-card {
+    break-inside: avoid;
+  }
+}

@@ -35,8 +35,8 @@ def compute_metrics(
     videos = sum(1 for r in asset_rows if r["resource_type"] == "video")
     sites_with_evidence = len({str(r["site_id"]) for r in asset_rows if r["site_id"]})
     captured_ats = [r["captured_at"] for r in asset_rows if r["captured_at"]]
-    first_capture = min(captured_ats).isoformat() if captured_ats else None
-    last_capture = max(captured_ats).isoformat() if captured_ats else None
+    first_capture = min(captured_ats).date().isoformat() if captured_ats else None
+    last_capture = max(captured_ats).date().isoformat() if captured_ats else None
 
     asset_ids = [r["id"] for r in asset_rows]
     top_activities: list[dict[str, Any]] = []
