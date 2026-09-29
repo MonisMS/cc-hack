@@ -6,7 +6,7 @@
 
 AI-tagged evidence · before/after comparisons · reports and campaign content · full lineage, built on **Cloudinary**.
 
-**[Live app](<ADD VERCEL URL>)** · **[Demo video](<ADD LINK>)** · [How it works](#how-it-works) · [Run it locally](#run-it-locally)
+**[Live app](https://cc-hack-pi.vercel.app)** · **[Demo video](<ADD LINK>)** · [How it works](#how-it-works) · [Run it locally](#run-it-locally)
 
 *Code Cubicle 6.0 · Problem statement 2: AI-Powered Impact & Sustainability Media Platform (Cloudinary)*
 
