@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Activity, ArrowLeftRight, Camera, MapPin } from "lucide-react";
 import { AssetGrid } from "@/components/asset-grid";
 import { LineagePanel } from "@/components/lineage-panel";
-import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,30 +151,37 @@ export default function ReportPage() {
         </div>
       </div>
 
-      {report.summary ? (
-        <div className="space-y-3">
-          {report.summary.paragraphs.map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {report.summary.highlights.map((h, i) => (
-              <li key={i}>{h}</li>
-            ))}
-          </ul>
-          <p className="text-xs text-muted-foreground">model: {report.summary_model ?? "template"}</p>
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="secondary">{metrics.assets_total ?? 0} assets</Badge>
-        <Badge variant="secondary">{metrics.images ?? 0} photos</Badge>
-        <Badge variant="secondary">{metrics.sites_with_evidence ?? 0} sites</Badge>
-        {metrics.first_capture ? (
-          <Badge variant="secondary">
-            {metrics.first_capture} → {metrics.last_capture}
-          </Badge>
-        ) : null}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Photos analysed" value={metrics.images ?? 0} sub={`${metrics.assets_total ?? 0} assets in range`} icon={Camera} gradient="sunset" />
+        <StatCard label="Sites with evidence" value={metrics.sites_with_evidence ?? 0} sub={metrics.first_capture ? `${metrics.first_capture} → ${metrics.last_capture}` : undefined} icon={MapPin} gradient="ocean" />
+        <StatCard label="Before / after comparisons" value={beforeAfterItems.length} sub="estimated green-cover change" icon={ArrowLeftRight} gradient="mint" />
+        <StatCard
+          label="Top activity"
+          value={metrics.top_activities?.[0]?.count ?? 0}
+          sub={metrics.top_activities?.[0] ? `photos tagged ${metrics.top_activities[0].tag.replace(/_/g, " ")}` : "no tagged activity"}
+          icon={Activity}
+          gradient="lilac"
+        />
       </div>
+
+      {report.summary ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-[15px] leading-relaxed">
+            {report.summary.paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+            <ul className="list-disc space-y-1 pl-5 text-sm">
+              {report.summary.highlights.map((h, i) => (
+                <li key={i}>{h}</li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">model: {report.summary_model ?? "template"}</p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {beforeAfterItems.length > 0 ? (
         <Card>

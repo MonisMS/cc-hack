@@ -9,9 +9,13 @@ Built for Code Cubicle 6.0, problem statement 2 (Cloudinary).
 
 ---
 
+## The problem
+
+NGOs and community groups collect photos while planting trees, cleaning public spaces, repairing infrastructure and running other field projects. That evidence stays scattered across phones and drives, so it's hard to show what happened, where it happened and what changed. Building a donor-ready report means hours of manual sorting and hunting for before-and-after images. And teams need confidence that a published image and its numbers can be traced back to the original evidence.
+
 ## What it does
 
-NGOs and field teams collect thousands of photos from sites. FieldProof organizes them automatically and turns them into evidence someone can trust:
+FieldProof organizes field photos automatically and turns them into evidence someone can trust:
 
 1. **Upload** photos from a phone or laptop straight to Cloudinary (consent checkbox, optional device location).
 2. **Automatic analysis**: a background worker reads EXIF date and GPS, embeds each image with CLIP, tags activities (sapling, flood, mangrove, waste, solar…), adds Cloudinary object-detection tags and assigns the photo to the nearest project site.
@@ -141,4 +145,9 @@ Demo photos come from Wikimedia Commons under their respective licences. The ful
 
 ## Team
 
-Monis · Ujjwal · Chaubey · Aditya
+| Person | Role |
+|---|---|
+| Monis | Owner; backend, demo data, merging PRs and submission |
+| Ujjwal | Frontend: shared components, library and asset pages |
+| Chaubey | Credits page, demo photos and README draft |
+| Aditya | Search page, testing, screenshots and demo-video help |

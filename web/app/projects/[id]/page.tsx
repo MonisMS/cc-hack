@@ -5,19 +5,13 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AddSiteDialog } from "@/components/add-site-dialog";
 import { NewReportDialog } from "@/components/new-report-dialog";
+import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, ApiErr } from "@/lib/api";
 import type { Comparison, Project, Report, Site } from "@/lib/types";
-
-const REPORT_STATUS_VARIANT: Record<Report["status"], "secondary" | "default" | "destructive"> = {
-  pending: "secondary",
-  processing: "secondary",
-  ready: "default",
-  failed: "destructive",
-};
 
 export default function ProjectOverviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -134,7 +128,7 @@ export default function ProjectOverviewPage() {
                   <Link href={`/reports/${r.id}`} className="text-sm hover:underline">
                     {r.date_from} → {r.date_to}
                   </Link>
-                  <Badge variant={REPORT_STATUS_VARIANT[r.status]}>{r.status}</Badge>
+                  <StatusBadge status={r.status} />
                 </li>
               ))}
             </ul>

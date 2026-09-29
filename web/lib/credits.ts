@@ -112,7 +112,7 @@ export const CREDITS: Credit[] = [
   },
   {
     "file": "File:Dr. Babasaheb Ambedkar planting a sapling of Bodhi tree (Pipal Tree) in the campus of Milind College, Aurangabad.jpg",
-    "author": "Unknown authorUnknown author",
+    "author": "Unknown author",
     "license": "Public domain",
     "source": "https://commons.wikimedia.org/wiki/File:Dr._Babasaheb_Ambedkar_planting_a_sapling_of_Bodhi_tree_(Pipal_Tree)_in_the_campus_of_Milind_College,_Aurangabad.jpg"
   },

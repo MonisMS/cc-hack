@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -49,38 +49,38 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.972 0.006 285);
+  --foreground: oklch(0.2 0.02 285);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.02 285);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.2 0.02 285);
+  --primary: oklch(0.56 0.2 283);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.025 285);
+  --secondary-foreground: oklch(0.46 0.17 283);
+  --muted: oklch(0.962 0.008 285);
+  --muted-foreground: oklch(0.56 0.02 285);
+  --accent: oklch(0.955 0.025 285);
+  --accent-foreground: oklch(0.46 0.17 283);
+  --destructive: oklch(0.6 0.22 25);
+  --border: oklch(0.925 0.01 285);
+  --input: oklch(0.915 0.012 285);
+  --ring: oklch(0.7 0.14 283);
+  --chart-1: oklch(0.56 0.2 283);
+  --chart-2: oklch(0.8 0.1 283);
+  --chart-3: oklch(0.72 0.14 200);
+  --chart-4: oklch(0.75 0.15 30);
+  --chart-5: oklch(0.8 0.14 150);
+  --radius: 1rem;
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.2 0.02 285);
+  --sidebar-primary: oklch(0.56 0.2 283);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.955 0.025 285);
+  --sidebar-accent-foreground: oklch(0.46 0.17 283);
+  --sidebar-border: oklch(0.94 0.008 285);
+  --sidebar-ring: oklch(0.7 0.14 283);
 }
 
 .dark {
@@ -126,6 +126,57 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Tailwind v4 resets buttons to the default cursor; restore the pointer on everything clickable. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="option"],
+  [role="tab"],
+  [role="checkbox"],
+  input[type="checkbox"],
+  select,
+  summary,
+  label[for],
+  a[href] {
+    cursor: pointer;
+  }
+}
+
+/* Mesh-gradient surfaces for stat cards and the hero banner. */
+@layer components {
+  .bg-grad-sunset {
+    background:
+      radial-gradient(120% 90% at 100% 20%, oklch(0.78 0.16 35 / 0.95), transparent 60%),
+      radial-gradient(90% 80% at 10% 100%, oklch(0.86 0.1 350 / 0.9), transparent 65%),
+      radial-gradient(80% 80% at 0% 0%, oklch(0.84 0.09 290), transparent 70%),
+      oklch(0.95 0.04 20);
+  }
+  .bg-grad-ocean {
+    background:
+      radial-gradient(110% 90% at 100% 90%, oklch(0.7 0.15 255 / 0.95), transparent 60%),
+      radial-gradient(90% 90% at 0% 10%, oklch(0.88 0.12 180), transparent 65%),
+      radial-gradient(70% 70% at 50% 50%, oklch(0.96 0.03 200), transparent 70%),
+      oklch(0.88 0.08 215);
+  }
+  .bg-grad-mint {
+    background:
+      radial-gradient(110% 90% at 100% 0%, oklch(0.9 0.13 110 / 0.95), transparent 60%),
+      radial-gradient(100% 90% at 0% 100%, oklch(0.8 0.14 160), transparent 65%),
+      radial-gradient(70% 70% at 40% 40%, oklch(0.97 0.03 140), transparent 70%),
+      oklch(0.9 0.08 150);
+  }
+  .bg-grad-lilac {
+    background:
+      radial-gradient(110% 90% at 100% 100%, oklch(0.72 0.15 300 / 0.95), transparent 60%),
+      radial-gradient(90% 90% at 0% 0%, oklch(0.9 0.07 250), transparent 65%),
+      radial-gradient(70% 70% at 60% 30%, oklch(0.97 0.02 320), transparent 70%),
+      oklch(0.88 0.07 290);
+  }
+  .bg-grad-hero {
+    background:
+      radial-gradient(60% 120% at 85% 10%, oklch(0.72 0.15 290 / 0.55), transparent 60%),
+      radial-gradient(50% 100% at 0% 100%, oklch(0.5 0.2 275 / 0.6), transparent 70%),
+      linear-gradient(120deg, oklch(0.58 0.2 283), oklch(0.53 0.21 280));
   }
 }
 

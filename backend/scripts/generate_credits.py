@@ -10,9 +10,13 @@ CREDITS_MD = ROOT / "backend" / "samples" / "public" / "CREDITS.md"
 OUT_TS = ROOT / "web" / "lib" / "credits.ts"
 
 ANCHOR_RE = re.compile(r"<a\b[^>]*>(.*?)</a>", re.IGNORECASE | re.DOTALL)
+HIDDEN_RE = re.compile(
+    r"<(\w+)\b[^>]*display:\s*none[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL
+)
 
 
 def strip_html(text: str) -> str:
+    text = HIDDEN_RE.sub("", text)
     text = ANCHOR_RE.sub(r"\1", text)
     text = re.sub(r"<[^>]+>", "", text)
     return html.unescape(text).strip()

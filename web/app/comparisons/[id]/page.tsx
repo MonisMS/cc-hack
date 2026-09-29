@@ -4,8 +4,9 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 import { LineagePanel } from "@/components/lineage-panel";
+import { Sprout, Trees, TrendingUp } from "lucide-react";
+import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePoll } from "@/lib/api";
@@ -92,16 +93,32 @@ export default function ComparisonPage() {
         </Button>
       ) : null}
 
-      <div className="rounded-lg border p-4">
-        <p className="text-lg font-semibold">
-          Estimated green cover: {comparison.before_green_pct_rounded ?? "—"}% → {comparison.after_green_pct_rounded ?? "—"}%
-          {comparison.delta_green_pct_rounded != null ? (
-            <span className="ml-2 text-muted-foreground">
-              ({comparison.delta_green_pct_rounded > 0 ? "+" : ""}
-              {comparison.delta_green_pct_rounded} points)
-            </span>
-          ) : null}
-        </p>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Green cover before"
+          value={comparison.before_green_pct_rounded != null ? `${comparison.before_green_pct_rounded}%` : "—"}
+          sub={comparison.before.captured_at?.slice(0, 10) ?? "unknown date"}
+          icon={Sprout}
+          gradient="sunset"
+        />
+        <StatCard
+          label="Green cover after"
+          value={comparison.after_green_pct_rounded != null ? `${comparison.after_green_pct_rounded}%` : "—"}
+          sub={comparison.after.captured_at?.slice(0, 10) ?? "unknown date"}
+          icon={Trees}
+          gradient="mint"
+        />
+        <StatCard
+          label="Estimated change"
+          value={
+            comparison.delta_green_pct_rounded != null
+              ? `${comparison.delta_green_pct_rounded > 0 ? "+" : ""}${comparison.delta_green_pct_rounded}`
+              : "—"
+          }
+          sub="percentage points, colour-threshold estimate"
+          icon={TrendingUp}
+          gradient="ocean"
+        />
       </div>
 
       {comparison.description ? (
@@ -111,10 +128,6 @@ export default function ComparisonPage() {
         </div>
       ) : null}
 
-      <div className="flex gap-2">
-        <Badge variant="secondary">before: {comparison.before.captured_at?.slice(0, 10) ?? "unknown date"}</Badge>
-        <Badge variant="secondary">after: {comparison.after.captured_at?.slice(0, 10) ?? "unknown date"}</Badge>
-      </div>
     </div>
   );
 }
