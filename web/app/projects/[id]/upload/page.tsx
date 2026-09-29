@@ -6,13 +6,38 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { Check, ImageUp, LocateFixed, ShieldCheck } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiErr, usePoll } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { AssetDetail } from "@/lib/types";
 
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_IMAGE_PRESET ?? "fp_image";
+
+// Themes Cloudinary's upload popup to match the app (palette/fonts keys per the Upload Widget docs).
+const WIDGET_STYLES = {
+  palette: {
+    window: "#FFFFFF",
+    windowBorder: "#E4E2F0",
+    tabIcon: "#6B5CE7",
+    menuIcons: "#6E6A85",
+    textDark: "#1E1B2E",
+    textLight: "#FFFFFF",
+    link: "#6B5CE7",
+    action: "#6B5CE7",
+    inactiveTabIcon: "#9E98BF",
+    error: "#E5484D",
+    inProgress: "#6B5CE7",
+    complete: "#1FA971",
+    sourceBg: "#F7F6FC",
+  },
+  fonts: {
+    "'Plus Jakarta Sans', sans-serif": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap",
+  },
+};
 
 type TrackedUpload = { assetId: string; filename: string };
 
@@ -23,18 +48,26 @@ function UploadStatusRow({ assetId, filename }: { assetId: string; filename: str
   );
   const status = data?.status ?? "pending";
   return (
-    <li className="flex items-center justify-between py-2 text-sm">
-      <span className="truncate">{filename}</span>
-      <div className="flex items-center gap-2">
-        <Badge variant={status === "ready" ? "default" : status === "failed" ? "destructive" : "secondary"}>
-          {status}
-        </Badge>
-        {status === "ready" ? (
-          <Link href={`/assets/${assetId}`} className="text-primary hover:underline">
-            View
-          </Link>
-        ) : null}
+    <li className="flex items-center gap-3 py-3">
+      {data?.thumb_url ? (
+        <img src={data.thumb_url} alt="" className="size-12 shrink-0 rounded-xl object-cover" />
+      ) : (
+        <div className="size-12 shrink-0 animate-pulse rounded-xl bg-muted" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">{filename}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {status === "ready"
+            ? `${data?.site_name ?? "No site"} · ${data?.tags.slice(0, 3).map((t) => t.tag.replace(/_/g, " ")).join(", ") || "no tags"}`
+            : status === "failed"
+              ? data?.error ?? "Analysis failed"
+              : "Reading date and location, tagging with AI..."}
+        </p>
       </div>
+      <StatusBadge status={status} />
+      {status === "ready" ? (
+        <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/assets/${assetId}`}>View</Link>} />
+      ) : null}
     </li>
   );
 }
@@ -114,37 +147,48 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="p-8 space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold">Upload photos</h1>
-        <p className="text-muted-foreground">
-          Photos only. Videos are supported by the backend but not exposed here.
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6 p-8">
+      <PageHeader title="Upload photos" subtitle="Add field photos to this project. Each one is analysed automatically within seconds." />
 
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 size-4"
-            />
-            I have permission to use these photos.
-          </label>
-
-          <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" onClick={useMyLocation} disabled={locating}>
-              {locating ? "Locating..." : "Use my location"}
-            </Button>
-            {deviceLat != null && deviceLng != null ? (
-              <span className="text-xs text-muted-foreground">
-                {deviceLat.toFixed(4)}, {deviceLng.toFixed(4)}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">optional</span>
+      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setConsent((c) => !c)}
+            className={cn(
+              "flex w-full items-center gap-4 rounded-2xl bg-card p-4 text-left ring-1 transition-colors",
+              consent ? "ring-primary/60" : "ring-foreground/[0.06] hover:ring-primary/30",
             )}
+          >
+            <span
+              className={cn(
+                "grid size-10 shrink-0 place-items-center rounded-xl transition-colors",
+                consent ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
+              )}
+            >
+              {consent ? <Check className="size-5" /> : <ShieldCheck className="size-5" />}
+            </span>
+            <span>
+              <span className="block text-sm font-semibold">I have permission to use these photos</span>
+              <span className="block text-xs text-muted-foreground">Required. People in the photos agreed to be photographed.</span>
+            </span>
+          </button>
+
+          <div className="flex items-center gap-4 rounded-2xl bg-card p-4 ring-1 ring-foreground/[0.06]">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-secondary-foreground">
+              <LocateFixed className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Location</p>
+              <p className="text-xs text-muted-foreground">
+                {deviceLat != null && deviceLng != null
+                  ? `Using ${deviceLat.toFixed(4)}, ${deviceLng.toFixed(4)} for photos without GPS`
+                  : "Optional. Used only for photos that don't carry their own GPS."}
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={useMyLocation} disabled={locating}>
+              {locating ? "Locating..." : deviceLat != null ? "Update" : "Use my location"}
+            </Button>
           </div>
 
           <CldUploadWidget
@@ -155,16 +199,50 @@ export default function UploadPage() {
               multiple: true,
               maxFiles: 20,
               clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "heic"],
+              styles: WIDGET_STYLES,
             }}
           >
             {({ open }) => (
-              <Button type="button" disabled={!consent} onClick={() => open()}>
-                Upload photos
-              </Button>
+              <button
+                type="button"
+                disabled={!consent}
+                onClick={() => open()}
+                className="group flex w-full flex-col items-center gap-3 rounded-3xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-violet-50 via-white to-teal-50 px-6 py-12 text-center transition-colors hover:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_10px_24px_-10px_var(--primary)] transition-transform group-enabled:group-hover:-translate-y-0.5">
+                  <ImageUp className="size-6" />
+                </span>
+                <span className="type-title">{consent ? "Choose photos or take one" : "Confirm permission to start"}</span>
+                <span className="text-sm text-muted-foreground">JPG, PNG, WEBP or HEIC · up to 20 at a time · camera works on phones</span>
+              </button>
             )}
           </CldUploadWidget>
-        </CardContent>
-      </Card>
+        </div>
+
+        <Card className="h-fit">
+          <CardHeader>
+            <CardTitle>What happens next</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ol className="space-y-3">
+              {[
+                "Uploads go straight to Cloudinary",
+                "Date and GPS are read from the photo",
+                "It's placed on the nearest site",
+                "CLIP and object detection tag it",
+                "It becomes searchable in plain English",
+              ].map((step, i) => (
+                <li key={step} className="flex items-center gap-3 text-sm">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
+                    {i + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      </div>
 
       {uploads.length > 0 ? (
         <Card>

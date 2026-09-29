@@ -40,7 +40,7 @@ export default function ComparisonPage() {
   if (comparison.status === "pending" || comparison.status === "processing") {
     return (
       <div className="p-8 space-y-4">
-        <h1 className="text-2xl font-semibold">Building comparison...</h1>
+        <h1 className="type-display">Building comparison...</h1>
         <StatusBadge status={comparison.status} />
         <Skeleton className="aspect-video" />
       </div>
@@ -50,7 +50,7 @@ export default function ComparisonPage() {
   if (comparison.status === "failed") {
     return (
       <div className="p-8 space-y-2">
-        <h1 className="text-2xl font-semibold">Comparison failed</h1>
+        <h1 className="type-display">Comparison failed</h1>
         <p className="text-sm text-muted-foreground">Something went wrong building this comparison.</p>
       </div>
     );
@@ -64,7 +64,7 @@ export default function ComparisonPage() {
     <div className="p-8 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{comparison.site_name}</h1>
+          <h1 className="type-display">{comparison.site_name}</h1>
           <p className="text-muted-foreground">
             {comparison.days_apart} days apart
             {comparison.framing_warning ? " · framing differs from before to after" : ""}

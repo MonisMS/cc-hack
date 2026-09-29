@@ -98,7 +98,7 @@ export default function SearchPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Search</h1>
+        <h1 className="type-display">Search</h1>
         <p className="text-sm text-muted-foreground">
           Describe what you&apos;re looking for in plain English. The AI matches what&apos;s in the photo, not just its tags.
         </p>
@@ -195,7 +195,7 @@ export default function SearchPage() {
 
       {!searched && !loading ? (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold tracking-tight">Try a search</h2>
+          <h2 className="type-title">Try a search</h2>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {EXAMPLE_QUERIES.map(({ q, icon: Icon, gradient }) => (
               <button

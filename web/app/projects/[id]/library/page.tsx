@@ -84,7 +84,7 @@ export default function LibraryPage() {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Library</h1>
+        <h1 className="type-display">Library</h1>
         <p className="text-muted-foreground">All uploaded photos in this project.</p>
       </div>
 

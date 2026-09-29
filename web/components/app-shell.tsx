@@ -3,7 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Award, FolderKanban, Images, LayoutDashboard, Leaf, Search, Upload, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Award,
+  FileText,
+  FolderKanban,
+  Images,
+  LayoutDashboard,
+  Leaf,
+  MapPin,
+  Route,
+  Search,
+  Upload,
+  type LucideIcon,
+} from "lucide-react";
 import { TUNNEL_HEADERS } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -43,14 +56,14 @@ function HealthDot() {
 
 function NavLink({ href, icon: Icon, children }: { href: string; icon: LucideIcon; children: React.ReactNode }) {
   const pathname = usePathname();
-  // Dashboard and project overview match exactly; other links also match their sub-pages.
-  const exact = href === "/" || /^\/projects\/[^/]+$/.test(href);
+  // Dashboard matches exactly; other links also match their sub-pages.
+  const exact = href === "/";
   const active = exact ? pathname === href : pathname.startsWith(href);
   return (
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+        "flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
         active ? "bg-accent text-accent-foreground font-medium" : "text-foreground/70",
       )}
     >
@@ -61,13 +74,10 @@ function NavLink({ href, icon: Icon, children }: { href: string; icon: LucideIco
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="px-3 pb-2 pt-6 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{children}</div>;
+  return <div className="px-3 pb-1.5 pt-5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{children}</div>;
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
-  const projectId = projectMatch?.[1];
 
   return (
     <div className="flex min-h-screen">
@@ -77,22 +87,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="grid size-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_16px_-6px_var(--primary)]">
               <Leaf className="size-[18px]" />
             </span>
-            <span className="text-lg font-semibold tracking-tight">FieldProof</span>
+            <span className="type-title">FieldProof</span>
           </Link>
         </div>
-        <nav className="flex-1 space-y-1 px-3">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
           <SectionLabel>Overview</SectionLabel>
           <NavLink href="/" icon={LayoutDashboard}>Dashboard</NavLink>
           <NavLink href="/search" icon={Search}>Search</NavLink>
-          {projectId ? (
-            <>
-              <SectionLabel>Project</SectionLabel>
-              <NavLink href={`/projects/${projectId}`} icon={FolderKanban}>Overview</NavLink>
-              <NavLink href={`/projects/${projectId}/upload`} icon={Upload}>Upload</NavLink>
-              <NavLink href={`/projects/${projectId}/library`} icon={Images}>Library</NavLink>
-            </>
-          ) : null}
+          <SectionLabel>Workspace</SectionLabel>
+          <NavLink href="/projects" icon={FolderKanban}>Projects</NavLink>
+          <NavLink href="/library" icon={Images}>Library</NavLink>
+          <NavLink href="/sites" icon={MapPin}>Sites</NavLink>
+          <NavLink href="/comparisons" icon={ArrowLeftRight}>Comparisons</NavLink>
+          <NavLink href="/reports" icon={FileText}>Reports</NavLink>
+          <NavLink href="/upload" icon={Upload}>Upload</NavLink>
           <SectionLabel>About</SectionLabel>
+          <NavLink href="/how-it-works" icon={Route}>How it works</NavLink>
           <NavLink href="/credits" icon={Award}>Credits</NavLink>
         </nav>
         <div className="px-3 pb-4">

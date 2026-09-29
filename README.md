@@ -130,7 +130,7 @@ pnpm dev                      # → http://localhost:3000
 
 ## Privacy
 
-- **Faces are blurred** (`e_blur_faces`) on every displayed and shared derivative: comparisons, reports and campaign kit.
+- **Faces are blurred** (`e_blur_faces`) on every image made for sharing: before/after comparisons and all campaign-kit outputs (social square, story, collage).
 - Uploaders must **confirm consent** before a photo can be uploaded.
 - Location comes from photo EXIF or, only if the user taps "Use my location", from the device.
 

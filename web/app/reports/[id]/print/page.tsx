@@ -45,7 +45,7 @@ export default function ReportPrintPage() {
       </div>
 
       <div className="print-card space-y-1 border-b pb-4">
-        <h1 className="text-2xl font-semibold">{report.summary?.headline ?? "Field report"}</h1>
+        <h1 className="type-display">{report.summary?.headline ?? "Field report"}</h1>
         <p className="text-sm text-muted-foreground">
           {report.date_from} → {report.date_to}
         </p>

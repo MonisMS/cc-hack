@@ -54,7 +54,7 @@ export default function ProjectOverviewPage() {
   return (
     <div className="p-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">{project.name}</h1>
+        <h1 className="type-display">{project.name}</h1>
         {project.description ? <p className="text-muted-foreground mt-1">{project.description}</p> : null}
         <div className="flex flex-wrap gap-2 mt-3 text-xs">
           <Badge variant="secondary">{project.site_count} sites</Badge>

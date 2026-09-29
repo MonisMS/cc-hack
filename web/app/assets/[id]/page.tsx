@@ -157,7 +157,7 @@ export default function AssetDetailPage() {
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{asset.site_name ?? "Unassigned asset"}</h1>
+          <h1 className="type-display">{asset.site_name ?? "Unassigned asset"}</h1>
           <div className="mt-1 flex items-center gap-2">
             <StatusBadge status={asset.status} />
             {asset.error ? <span className="text-xs text-destructive">{asset.error}</span> : null}

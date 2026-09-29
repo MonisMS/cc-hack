@@ -70,7 +70,7 @@ export default function ComparePage() {
   return (
     <div className="p-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Compare{site ? ` — ${site.name}` : ""}</h1>
+        <h1 className="type-display">Compare{site ? ` — ${site.name}` : ""}</h1>
         <p className="text-muted-foreground">Pick a before/after pair to build a comparison.</p>
       </div>
 

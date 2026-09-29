@@ -35,7 +35,7 @@ export function StatCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="max-w-[10rem] text-[15px] leading-snug font-medium">{label}</p>
+        <p className="max-w-[10rem] text-[15px] leading-snug font-semibold">{label}</p>
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/45 backdrop-blur-sm">
           <Icon className="size-[18px]" />
         </span>
@@ -44,9 +44,9 @@ export function StatCard({
         {value === null ? (
           <Skeleton className="h-11 w-16 bg-white/50" />
         ) : (
-          <p className="text-5xl font-light tracking-tight">{value}</p>
+          <p className="type-stat">{value}</p>
         )}
-        {sub ? <p className="mt-1 text-xs text-foreground/70">{sub}</p> : null}
+        {sub ? <p className="mt-1.5 text-xs font-medium text-foreground/65">{sub}</p> : null}
       </div>
     </div>
   );

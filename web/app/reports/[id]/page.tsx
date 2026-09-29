@@ -106,7 +106,7 @@ export default function ReportPage() {
   if (report.status === "pending" || report.status === "processing") {
     return (
       <div className="p-8 space-y-4">
-        <h1 className="text-2xl font-semibold">Generating report...</h1>
+        <h1 className="type-display">Generating report...</h1>
         <Skeleton className="h-32" />
       </div>
     );
@@ -115,7 +115,7 @@ export default function ReportPage() {
   if (report.status === "failed") {
     return (
       <div className="p-8 space-y-2">
-        <h1 className="text-2xl font-semibold">Report failed</h1>
+        <h1 className="type-display">Report failed</h1>
         <p className="text-sm text-muted-foreground">Something went wrong generating this report.</p>
       </div>
     );
@@ -138,7 +138,7 @@ export default function ReportPage() {
     <div className="p-8 space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{report.summary?.headline ?? "Report"}</h1>
+          <h1 className="type-display">{report.summary?.headline ?? "Report"}</h1>
           <p className="text-muted-foreground">
             {report.date_from} → {report.date_to}
           </p>
